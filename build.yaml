@@ -1,0 +1,4 @@
+include:
+  - board: xiao_ble//zmk
+    shield: onekey_xiao
+

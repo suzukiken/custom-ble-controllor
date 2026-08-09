@@ -1,0 +1,7 @@
+if SHIELD_ONEKEY_XIAO
+
+config ZMK_KEYBOARD_NAME
+    default "OneKey Xiao"
+
+endif
+
