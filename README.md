@@ -4,6 +4,8 @@ Seeed Studio XIAO nRF52840 を使った、1キーだけのBLE HIDキーボード
 
 現在のZMK公式ドキュメントに合わせ、MCU boardは `xiao_ble//zmk`、自作ハードウェアは shield `onekey_xiao` として定義しています。XIAOのD0はshield overlay内で `&xiao_d 0` として参照します。
 
+ZMK本体は `config/west.yml` で特定のcommit SHAにpinしています。`main` ブランチを直接追うと破壊的変更でビルドが失敗する可能性があるためです。最新releaseの `v0.3.0` は旧board名 `seeeduino_xiao_ble` の世代なので、この構成では現在の公式board名 `xiao_ble//zmk` に対応したmain上のcommitを固定しています。
+
 ## 配線
 
 キースイッチを XIAO nRF52840 の `D0` と `GND` の間に接続します。
@@ -74,6 +76,7 @@ Actionsが成功したら、対象runのArtifactsから `firmware` をダウン�
 ```text
 .
 ├── .github/workflows/build.yml
+├── .gitignore
 ├── build.yaml
 ├── config/
 │   ├── onekey_xiao.conf
@@ -86,4 +89,3 @@ Actionsが成功したら、対象runのArtifactsから `firmware` をダウン�
 │   └── onekey_xiao.zmk.yml
 └── zephyr/module.yml
 ```
-
