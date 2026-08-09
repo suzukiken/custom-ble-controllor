@@ -8,3 +8,19 @@
 /bootloader/
 *.uf2
 *.hex
+.DS_Store
+
+# KiCad
+*.kicad_prl
+fp-info-cache
+*-backups/
+.history/
+*.bak
+*.bck
+*_autosave-*
+~*.lck
+*.lck
+
+# Fabrication outputs (regenerable)
+*.gbr
+*.drl
