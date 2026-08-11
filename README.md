@@ -1,75 +1,117 @@
-# OneKey Xiao ZMK Config
+# Xiao ZMK Config
 
-Seeed Studio XIAO nRF52840 を使った、1キーだけのBLE HIDキーボード用ZMK user config repositoryです。
+Seeed Studio XIAO nRF52840 向けの ZMK user config です。`pcb/` の基板組み合わせごとに shield を分け、GitHub Actions で UF2 をビルドします。
 
-現在のZMK公式ドキュメントに合わせ、MCU boardは `xiao_ble//zmk`、自作ハードウェアは shield `onekey_xiao` として定義しています。XIAOのD0はshield overlay内で `&xiao_d 0` として参照します。
+Board は `xiao_ble//zmk`。ZMK 本体は [`config/west.yml`](config/west.yml) で commit `268b1b1e82150460f00fd701bcd08583d5c75d29` に固定しています。
 
-ZMK本体は `config/west.yml` で特定のcommit SHAにpinしています。`main` ブランチを直接追うと破壊的変更でビルドが失敗する可能性があるためです。最新releaseの `v0.3.0` は旧board名 `seeeduino_xiao_ble` の世代なので、この構成では現在の公式board名 `xiao_ble//zmk` に対応したmain上のcommitを固定しています。
+## Shield 一覧
+
+| Shield | ハードウェア | ピン | キーマップ / センサ |
+| --- | --- | --- | --- |
+| `onekey_xiao` | `one-key` | D0 ↔ GND | `SPACE` |
+| `key_xiao` | `main-board` + `key-board`（PH 2） | D0 ↔ GND | `SPACE` |
+| `encoder_xiao` | `main-board` + `encoder-board`（PH 3） | D1=A, D2=B, GND=C | 回転: `C_VOL_UP` / `C_VOL_DN` |
+| `push_encoder_xiao` | `main-board` + `push-encoder-board`（PH 4） | D7=A, D6=B, D5=SW, GND=C | Push: `C_MUTE` / 回転: 音量 |
+| `fourway_xiao` | `main-board-8` + `4way-re-board`（8ピン, RKJXT1F42001） | 下表 | 十字・Enter・音量 |
+
+BLE 名はそれぞれ `OneKey Xiao` / `Key Xiao` / `Encoder Xiao` / `PushEncoder Xiao` / `Fourway Xiao` です。
+
+共通設定（各 `config/*.conf`）:
+
+- `CONFIG_ZMK_BLE=y` / `CONFIG_ZMK_USB=n`
+- `CONFIG_ZMK_SLEEP=y` / `CONFIG_ZMK_IDLE_SLEEP_TIMEOUT=60000`（60秒）
+- エンコーダ付きは `CONFIG_EC11=y`
 
 ## 配線
 
-キースイッチを XIAO nRF52840 の `D0` と `GND` の間に接続します。
+### onekey_xiao / key_xiao
 
 ```text
-XIAO D0 ----[ key switch ]---- XIAO GND
+XIAO D0 ----[ switch ]---- XIAO GND
 ```
 
-GPIOは内部プルアップを使います。キーを押すとD0がGNDへ落ちるため、ZMK側では `GPIO_ACTIVE_LOW | GPIO_PULL_UP` として定義しています。
+`zmk,kscan-gpio-direct`、`GPIO_ACTIVE_LOW | GPIO_PULL_UP`。
 
-## 動作
+### encoder_xiao
 
-キーを押すとBLE HIDキーボードとして `SPACE` を送信します。
-
-通常の入力はBLEのみを使うため、`config/onekey_xiao.conf` で `CONFIG_ZMK_USB=n` にしています。UF2書き込み用のブートローダーは別なので、USB-CでのUF2書き込みは可能です。
-
-## ビルド方法
-
-GitHubにこのリポジトリをpushすると、GitHub Actionsの `Build ZMK firmware` が実行されます。
-
-```sh
-git add .
-git commit -m "Add one-key XIAO ZMK config"
-git push
+```text
+XIAO D1 ---- Encoder A
+XIAO D2 ---- Encoder B
+XIAO GND --- Encoder C
 ```
 
-ビルド対象は [build.yaml](build.yaml) で指定しています。
+キー入力は使わず（overlay 上の D10 は未使用スタブ）、回転のみ。
+
+### push_encoder_xiao
+
+```text
+XIAO D7 ---- Encoder A
+XIAO D6 ---- Encoder B
+XIAO D5 ---- SW (Push)
+XIAO GND --- Encoder C
+```
+
+### fourway_xiao（RKJXT1F42001）
+
+```text
+XIAO D4 ---- A      → UP
+XIAO D0 ---- B      → RIGHT
+XIAO D2 ---- C      → DOWN
+XIAO D3 ---- D      → LEFT
+XIAO D5 ---- Push   → ENTER
+XIAO D6 ---- Encoder A
+XIAO D1 ---- Encoder B
+XIAO GND --- GND (Com / ECom)
+```
+
+keymap の並びは A, B, C, D, Push。回転は `C_VOL_UP` / `C_VOL_DN`（`steps = 20`）。
+
+## ビルド
+
+[`build.yaml`](build.yaml) の全 shield が GitHub Actions（`Build ZMK firmware`）でビルドされます。
 
 ```yaml
 include:
   - board: xiao_ble//zmk
     shield: onekey_xiao
+  - board: xiao_ble//zmk
+    shield: key_xiao
+  - board: xiao_ble//zmk
+    shield: encoder_xiao
+  - board: xiao_ble//zmk
+    shield: push_encoder_xiao
+  - board: xiao_ble//zmk
+    shield: fourway_xiao
 ```
 
-Actionsが成功したら、対象runのArtifactsから `firmware` をダウンロードして展開します。生成されるUF2は `onekey_xiao-xiao_ble__zmk-zmk.uf2` のような名前になります。
+成果物（Artifacts の `firmware`）:
 
-## XIAOへのUF2書き込み方法
+- `onekey_xiao-xiao_ble__zmk-zmk.uf2`
+- `key_xiao-xiao_ble__zmk-zmk.uf2`
+- `encoder_xiao-xiao_ble__zmk-zmk.uf2`
+- `push_encoder_xiao-xiao_ble__zmk-zmk.uf2`
+- `fourway_xiao-xiao_ble__zmk-zmk.uf2`
 
-1. XIAO nRF52840をUSB-CでPCに接続します。
-2. XIAOの `RST` を素早く2回押してブートローダーモードに入れます。
-3. `XIAO-SENSE` または同等のUSBマスストレージがマウントされます。
-4. GitHub Actionsで取得した `.uf2` ファイルを、そのドライブへドラッグ&ドロップします。
-5. 書き込み後、自動で再起動します。
+### UF2 書き込み
 
-## BLEペアリング方法
+1. XIAO を USB-C 接続
+2. `RST` を素早く2回 → ブートローダー
+3. マウントされたドライブへ `.uf2` をコピー
 
-初回書き込み後、XIAOはBLEキーボードとして広告します。PC、iPad、AndroidなどのBluetooth設定を開き、`OneKey Xiao` を選択してペアリングしてください。
+### ペアリング
 
-この最小構成ではキーが1つだけなので、`BT_CLR` や `BT_SEL` はまだ割り当てていません。別の機器とペアリングし直す場合は、今後キーを増やしてBluetooth制御キーを追加するか、ZMKの `settings_reset` firmwareを一時的にビルドしてフラッシュし、保存済みペアリング情報を消去してください。
+OS の Bluetooth 設定で上記 BLE 名を選択。`BT_CLR` 等は未割り当てなので、付け直すときは `settings_reset` ファームを使うか、後から制御キーを追加してください。
 
-## 今後キーを増やす方法
+## 変更箇所
 
-キーを増やす場合は、主に次の2ファイルを変更します。
+| 目的 | ファイル |
+| --- | --- |
+| キーコード・音量など | `config/<shield>.keymap` |
+| ピン割り当て | `boards/shields/<shield>/<shield>.overlay` |
+| BLE / sleep / EC11 | `config/<shield>.conf` |
+| ビルド対象 | `build.yaml` |
 
-1. [boards/shields/onekey_xiao/onekey_xiao.overlay](boards/shields/onekey_xiao/onekey_xiao.overlay)
-   - `input-gpios` に使うXIAOピンを追加します。
-   - `columns` をキー数に合わせて増やします。
-   - `map` に `RC(0,0) RC(0,1) ...` のように位置を追加します。
-
-2. [config/onekey_xiao.keymap](config/onekey_xiao.keymap)
-   - `bindings` にキー数と同じ数の動作を追加します。
-   - 例: `&kp SPACE &kp ENTER &kp C_PLAY_PAUSE`
-
-メディアキーを追加する場合もkeymap側でZMKのキーコードやbehaviorを追加します。バッテリー動作や省電力機能は、まず [config/onekey_xiao.conf](config/onekey_xiao.conf) に設定を追加し、必要ならshield overlayにバッテリー測定用のdevicetree設定を追加する方針にすると拡張しやすいです。
+回転方向が逆のときは、該当 overlay の `a-gpios` と `b-gpios` を入れ替えます。
 
 ## ファイル構成
 
@@ -78,14 +120,30 @@ Actionsが成功したら、対象runのArtifactsから `firmware` をダウン�
 ├── .github/workflows/build.yml
 ├── .gitignore
 ├── build.yaml
+├── README.md
 ├── config/
-│   ├── onekey_xiao.conf
-│   ├── onekey_xiao.keymap
-│   └── west.yml
-├── boards/shields/onekey_xiao/
-│   ├── Kconfig.defconfig
-│   ├── Kconfig.shield
-│   ├── onekey_xiao.overlay
-│   └── onekey_xiao.zmk.yml
+│   ├── west.yml
+│   ├── onekey_xiao.conf / .keymap
+│   ├── key_xiao.conf / .keymap
+│   ├── encoder_xiao.conf / .keymap
+│   ├── push_encoder_xiao.conf / .keymap
+│   └── fourway_xiao.conf / .keymap
+├── boards/shields/
+│   ├── onekey_xiao/
+│   ├── key_xiao/
+│   ├── encoder_xiao/
+│   ├── push_encoder_xiao/
+│   └── fourway_xiao/
+├── pcb/
+│   ├── one-key.kicad_pcb
+│   ├── main-board.kicad_pcb
+│   ├── main-board-8.kicad_pcb
+│   ├── key-board.kicad_pcb
+│   ├── encoder-board.kicad_pcb
+│   ├── push-encoder-board.kicad_pcb
+│   ├── 4way-re-board.kicad_pcb
+│   └── README.md
 └── zephyr/module.yml
 ```
+
+Gerber（`*.gbr`）・ドリル（`*.drl`）・`*.kicad_prl` / `fp-info-cache` / `.history/` は `.gitignore` 対象です。

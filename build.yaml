@@ -1,4 +1,12 @@
 include:
   - board: xiao_ble//zmk
     shield: onekey_xiao
+  - board: xiao_ble//zmk
+    shield: key_xiao
+  - board: xiao_ble//zmk
+    shield: encoder_xiao
+  - board: xiao_ble//zmk
+    shield: push_encoder_xiao
+  - board: xiao_ble//zmk
+    shield: fourway_xiao
 

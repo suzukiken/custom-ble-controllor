@@ -1,0 +1,9 @@
+file_format: "1"
+id: encoder_xiao
+name: Encoder Xiao
+type: shield
+url: https://github.com/zmkfirmware/zmk
+requires: [seeed_xiao]
+features:
+  - keys
+  - encoder

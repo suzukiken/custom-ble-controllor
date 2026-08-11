@@ -1,0 +1,6 @@
+if SHIELD_PUSH_ENCODER_XIAO
+
+config ZMK_KEYBOARD_NAME
+	default "PushEncoder Xiao"
+
+endif

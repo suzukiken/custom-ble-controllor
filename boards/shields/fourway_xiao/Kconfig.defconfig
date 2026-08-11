@@ -1,0 +1,6 @@
+if SHIELD_FOURWAY_XIAO
+
+config ZMK_KEYBOARD_NAME
+	default "Fourway Xiao"
+
+endif
