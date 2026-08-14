@@ -6,10 +6,10 @@
         /* tap: SPACE / hold (~300ms): unlock ZMK Studio */
         stu: studio_space {
             compatible = "zmk,behavior-hold-tap";
-            #binding-cells = <0>;
+            #binding-cells = <1>;
             flavor = "hold-preferred";
             tapping-term-ms = <300>;
-            bindings = <&studio_unlock &kp SPACE>;
+            bindings = <&studio_unlock &kp>;
         };
     };
 
@@ -19,7 +19,7 @@
         default_layer {
             display-name = "Base";
             bindings = <
-                &stu
+                &stu SPACE
             >;
         };
 
