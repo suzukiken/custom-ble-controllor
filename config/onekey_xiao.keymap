@@ -6,20 +6,10 @@
         compatible = "zmk,keymap";
 
         default_layer {
-            display-name = "Base";
-            /* Press to unlock ZMK Studio, then assign SPACE (or any key) there */
             bindings = <
-                &studio_unlock
+                &kp SPACE
             >;
-        };
-
-        /* Available in ZMK Studio builds */
-        extra1 {
-            status = "reserved";
-        };
-
-        extra2 {
-            status = "reserved";
         };
     };
 };
+

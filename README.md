@@ -8,7 +8,7 @@ Board は `xiao_ble//zmk`。ZMK 本体は [`config/west.yml`](config/west.yml) �
 
 | Shield | ハードウェア | ピン | キーマップ / センサ |
 | --- | --- | --- | --- |
-| `onekey_xiao` | `one-key` | D0 ↔ GND | ZMK Studio unlock（Studio で `SPACE` 等に変更） |
+| `onekey_xiao` | `one-key` | D0 ↔ GND | `SPACE` |
 | `key_xiao` | `main-board` + `key-board`（PH 2） | D0 ↔ GND | `SPACE` |
 | `encoder_xiao` | `main-board` + `encoder-board`（PH 3） | D1=A, D2=B, GND=C | 回転: `C_VOL_UP` / `C_VOL_DN` |
 | `push_encoder_xiao` | `main-board` + `push-encoder-board`（PH 4） | D7=A, D6=B, D5=SW, GND=C | Push: `C_MUTE` / 回転: 音量 |
@@ -18,39 +18,9 @@ BLE 名はそれぞれ `OneKey Xiao` / `Key Xiao` / `Encoder Xiao` / `PushEnc Xi
 
 共通設定（各 `config/*.conf`）:
 
-- `CONFIG_ZMK_BLE=y`
+- `CONFIG_ZMK_BLE=y` / `CONFIG_ZMK_USB=n`
 - `CONFIG_ZMK_SLEEP=y` / `CONFIG_ZMK_IDLE_SLEEP_TIMEOUT=60000`（60秒）
 - エンコーダ付きは `CONFIG_EC11=y`
-- `onekey_xiao` のみ ZMK Studio 用に `CONFIG_ZMK_USB=y`（他は `CONFIG_ZMK_USB=n`）
-
-## ZMK Studio（`onekey_xiao`）
-
-`onekey_xiao` は [ZMK Studio](https://zmk.dev/docs/features/studio) でキー割り当てを変更できます（再フラッシュ不要）。
-
-1. Actions でビルドした `onekey_xiao-...uf2` を書き込む  
-   （`build.yaml` で `studio-rpc-usb-uart` + `CONFIG_ZMK_STUDIO=y`）
-2. USB で PC に接続し、https://zmk.studio/ を開く
-3. キーを押して unlock（初期割り当ては `&studio_unlock`）
-4. Studio 上で `SPACE` など好きなキーに変更して Save
-
-1キー構成のため、hold-tap で Space と unlock を同居させるのは ZMK の制約上むずかしく、初期は unlock 専用にしています。Studio で一度 Save すると、以降の変更も Studio 上で行えます（`.keymap` より端末の保存が優先。戻すときは Restore Stock Settings）。
-
-### BLE にペアできないとき
-
-ファーム更新後は古いボンディングで失敗しやすいです。次の順で試してください。
-
-1. PC/スマホ側で `OneKey Xiao` を削除（Forget）
-2. **USB ケーブルを抜く**（Studio 用 USB 接続中はペアしにくい）
-3. XIAO の `RST` を押すか、キーを一度押して起こす
-4. すぐ Bluetooth 設定で `OneKey Xiao` を追加
-
-それでもダメなら:
-
-1. Artifacts の `settings_reset` 用 uf2 を焼く（保存設定を消去）
-2. 続けて通常の `onekey_xiao` uf2 を焼く
-3. もう一度上記 1–4
-
-いまの `onekey_xiao.conf` には一時的に `CONFIG_ZMK_BLE_CLEAR_BONDS_ON_START=y` を入れています（起動のたびにボンディング消去）。ペアできたらこの行を消して再ビルドしてください。
 
 ## 配線
 
@@ -104,8 +74,6 @@ keymap の並びは A, B, C, D, Push。回転は `C_VOL_UP` / `C_VOL_DN`（`step
 include:
   - board: xiao_ble//zmk
     shield: onekey_xiao
-    snippet: studio-rpc-usb-uart
-    cmake-args: -DCONFIG_ZMK_STUDIO=y
   - board: xiao_ble//zmk
     shield: key_xiao
   - board: xiao_ble//zmk
@@ -114,8 +82,6 @@ include:
     shield: push_encoder_xiao
   - board: xiao_ble//zmk
     shield: fourway_xiao
-  - board: xiao_ble//zmk
-    shield: settings_reset
 ```
 
 成果物（Artifacts の `firmware`）:
@@ -125,7 +91,6 @@ include:
 - `encoder_xiao-xiao_ble__zmk-zmk.uf2`
 - `push_encoder_xiao-xiao_ble__zmk-zmk.uf2`
 - `fourway_xiao-xiao_ble__zmk-zmk.uf2`
-- `settings_reset-xiao_ble__zmk-zmk.uf2`（ペアリング復旧用）
 
 ### UF2 書き込み
 
