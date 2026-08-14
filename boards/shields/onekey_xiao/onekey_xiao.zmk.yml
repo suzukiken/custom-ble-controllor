@@ -6,4 +6,5 @@ url: https://github.com/zmkfirmware/zmk
 requires: [seeed_xiao]
 features:
   - keys
+  - studio
 

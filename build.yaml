@@ -1,6 +1,8 @@
 include:
   - board: xiao_ble//zmk
     shield: onekey_xiao
+    snippet: studio-rpc-usb-uart
+    cmake-args: -DCONFIG_ZMK_STUDIO=y
   - board: xiao_ble//zmk
     shield: key_xiao
   - board: xiao_ble//zmk

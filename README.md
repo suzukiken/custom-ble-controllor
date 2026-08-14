@@ -8,7 +8,7 @@ Board は `xiao_ble//zmk`。ZMK 本体は [`config/west.yml`](config/west.yml) �
 
 | Shield | ハードウェア | ピン | キーマップ / センサ |
 | --- | --- | --- | --- |
-| `onekey_xiao` | `one-key` | D0 ↔ GND | `SPACE` |
+| `onekey_xiao` | `one-key` | D0 ↔ GND | タップ `SPACE` / 長押しで ZMK Studio unlock |
 | `key_xiao` | `main-board` + `key-board`（PH 2） | D0 ↔ GND | `SPACE` |
 | `encoder_xiao` | `main-board` + `encoder-board`（PH 3） | D1=A, D2=B, GND=C | 回転: `C_VOL_UP` / `C_VOL_DN` |
 | `push_encoder_xiao` | `main-board` + `push-encoder-board`（PH 4） | D7=A, D6=B, D5=SW, GND=C | Push: `C_MUTE` / 回転: 音量 |
@@ -18,9 +18,22 @@ BLE 名はそれぞれ `OneKey Xiao` / `Key Xiao` / `Encoder Xiao` / `PushEnc Xi
 
 共通設定（各 `config/*.conf`）:
 
-- `CONFIG_ZMK_BLE=y` / `CONFIG_ZMK_USB=n`
+- `CONFIG_ZMK_BLE=y`
 - `CONFIG_ZMK_SLEEP=y` / `CONFIG_ZMK_IDLE_SLEEP_TIMEOUT=60000`（60秒）
 - エンコーダ付きは `CONFIG_EC11=y`
+- `onekey_xiao` のみ ZMK Studio 用に `CONFIG_ZMK_USB=y`（他は `CONFIG_ZMK_USB=n`）
+
+## ZMK Studio（`onekey_xiao`）
+
+`onekey_xiao` は [ZMK Studio](https://zmk.dev/docs/features/studio) でキー割り当てを変更できます（再フラッシュ不要）。
+
+1. Actions でビルドした `onekey_xiao-...uf2` を書き込む  
+   （`build.yaml` で `studio-rpc-usb-uart` + `CONFIG_ZMK_STUDIO=y`）
+2. USB で PC に接続し、https://zmk.studio/ を開く
+3. キーを約 300ms 長押しして unlock
+4. Studio 上でキーコードを変更して Save
+
+通常の短いタップはこれまでどおり `SPACE` です。Studio で一度設定を保存すると、以降は `.keymap` の変更より端末側の保存内容が優先されます（戻すときは Studio の Restore Stock Settings）。
 
 ## 配線
 
@@ -74,6 +87,8 @@ keymap の並びは A, B, C, D, Push。回転は `C_VOL_UP` / `C_VOL_DN`（`step
 include:
   - board: xiao_ble//zmk
     shield: onekey_xiao
+    snippet: studio-rpc-usb-uart
+    cmake-args: -DCONFIG_ZMK_STUDIO=y
   - board: xiao_ble//zmk
     shield: key_xiao
   - board: xiao_ble//zmk

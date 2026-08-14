@@ -2,14 +2,34 @@
 #include <dt-bindings/zmk/keys.h>
 
 / {
+    behaviors {
+        /* tap: SPACE / hold (~300ms): unlock ZMK Studio */
+        stu: studio_space {
+            compatible = "zmk,behavior-hold-tap";
+            #binding-cells = <0>;
+            flavor = "hold-preferred";
+            tapping-term-ms = <300>;
+            bindings = <&studio_unlock>, <&kp SPACE>;
+        };
+    };
+
     keymap {
         compatible = "zmk,keymap";
 
         default_layer {
+            display-name = "Base";
             bindings = <
-                &kp SPACE
+                &stu
             >;
+        };
+
+        /* Available in ZMK Studio builds */
+        extra1 {
+            status = "reserved";
+        };
+
+        extra2 {
+            status = "reserved";
         };
     };
 };
-
