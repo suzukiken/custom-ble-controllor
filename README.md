@@ -35,6 +35,23 @@ BLE 名はそれぞれ `OneKey Xiao` / `Key Xiao` / `Encoder Xiao` / `PushEnc Xi
 
 1キー構成のため、hold-tap で Space と unlock を同居させるのは ZMK の制約上むずかしく、初期は unlock 専用にしています。Studio で一度 Save すると、以降の変更も Studio 上で行えます（`.keymap` より端末の保存が優先。戻すときは Restore Stock Settings）。
 
+### BLE にペアできないとき
+
+ファーム更新後は古いボンディングで失敗しやすいです。次の順で試してください。
+
+1. PC/スマホ側で `OneKey Xiao` を削除（Forget）
+2. **USB ケーブルを抜く**（Studio 用 USB 接続中はペアしにくい）
+3. XIAO の `RST` を押すか、キーを一度押して起こす
+4. すぐ Bluetooth 設定で `OneKey Xiao` を追加
+
+それでもダメなら:
+
+1. Artifacts の `settings_reset` 用 uf2 を焼く（保存設定を消去）
+2. 続けて通常の `onekey_xiao` uf2 を焼く
+3. もう一度上記 1–4
+
+いまの `onekey_xiao.conf` には一時的に `CONFIG_ZMK_BLE_CLEAR_BONDS_ON_START=y` を入れています（起動のたびにボンディング消去）。ペアできたらこの行を消して再ビルドしてください。
+
 ## 配線
 
 ### onekey_xiao / key_xiao
@@ -97,6 +114,8 @@ include:
     shield: push_encoder_xiao
   - board: xiao_ble//zmk
     shield: fourway_xiao
+  - board: xiao_ble//zmk
+    shield: settings_reset
 ```
 
 成果物（Artifacts の `firmware`）:
@@ -106,6 +125,7 @@ include:
 - `encoder_xiao-xiao_ble__zmk-zmk.uf2`
 - `push_encoder_xiao-xiao_ble__zmk-zmk.uf2`
 - `fourway_xiao-xiao_ble__zmk-zmk.uf2`
+- `settings_reset-xiao_ble__zmk-zmk.uf2`（ペアリング復旧用）
 
 ### UF2 書き込み
 
