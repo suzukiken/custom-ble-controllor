@@ -8,7 +8,7 @@ Board は `xiao_ble//zmk`。ZMK 本体は [`config/west.yml`](config/west.yml) �
 
 | Shield | ハードウェア | ピン | キーマップ / センサ |
 | --- | --- | --- | --- |
-| `onekey_xiao` | `one-key` | D0 ↔ GND | タップ `SPACE` / 長押しで ZMK Studio unlock |
+| `onekey_xiao` | `one-key` | D0 ↔ GND | ZMK Studio unlock（Studio で `SPACE` 等に変更） |
 | `key_xiao` | `main-board` + `key-board`（PH 2） | D0 ↔ GND | `SPACE` |
 | `encoder_xiao` | `main-board` + `encoder-board`（PH 3） | D1=A, D2=B, GND=C | 回転: `C_VOL_UP` / `C_VOL_DN` |
 | `push_encoder_xiao` | `main-board` + `push-encoder-board`（PH 4） | D7=A, D6=B, D5=SW, GND=C | Push: `C_MUTE` / 回転: 音量 |
@@ -30,10 +30,10 @@ BLE 名はそれぞれ `OneKey Xiao` / `Key Xiao` / `Encoder Xiao` / `PushEnc Xi
 1. Actions でビルドした `onekey_xiao-...uf2` を書き込む  
    （`build.yaml` で `studio-rpc-usb-uart` + `CONFIG_ZMK_STUDIO=y`）
 2. USB で PC に接続し、https://zmk.studio/ を開く
-3. キーを約 300ms 長押しして unlock
-4. Studio 上でキーコードを変更して Save
+3. キーを押して unlock（初期割り当ては `&studio_unlock`）
+4. Studio 上で `SPACE` など好きなキーに変更して Save
 
-通常の短いタップはこれまでどおり `SPACE` です。Studio で一度設定を保存すると、以降は `.keymap` の変更より端末側の保存内容が優先されます（戻すときは Studio の Restore Stock Settings）。
+1キー構成のため、hold-tap で Space と unlock を同居させるのは ZMK の制約上むずかしく、初期は unlock 専用にしています。Studio で一度 Save すると、以降の変更も Studio 上で行えます（`.keymap` より端末の保存が優先。戻すときは Restore Stock Settings）。
 
 ## 配線
 
