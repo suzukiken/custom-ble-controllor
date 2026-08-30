@@ -1,0 +1,6 @@
+if SHIELD_KEY_ENCODER_XIAO
+
+config ZMK_KEYBOARD_NAME
+	default "KeyEnc Xiao"
+
+endif

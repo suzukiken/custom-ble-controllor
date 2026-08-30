@@ -13,8 +13,9 @@ Board は `xiao_ble//zmk`。ZMK 本体は [`config/west.yml`](config/west.yml) �
 | `encoder_xiao` | `main-board` + `encoder-board`（PH 3） | D1=A, D2=B, GND=C | 回転: `C_VOL_UP` / `C_VOL_DN` |
 | `push_encoder_xiao` | `main-board` + `push-encoder-board`（PH 4） | D7=A, D6=B, D5=SW, GND=C | Push: `C_MUTE` / 回転: 音量 |
 | `fourway_xiao` | `main-board-8` + `4way-re-board`（8ピン, RKJXT1F42001） | 下表 | 十字・Enter・音量 |
+| `key_encoder_xiao` | Xiao + keyswitch + encoder 一体 | D0=SW / D1=A, D2=B, GND | `SPACE` + 方向キー上下 |
 
-BLE 名はそれぞれ `OneKey Xiao` / `Key Xiao` / `Encoder Xiao` / `PushEnc Xiao` / `Fourway Xiao` です（ZMK の上限は15文字）。
+BLE 名はそれぞれ `OneKey Xiao` / `Key Xiao` / `Encoder Xiao` / `PushEnc Xiao` / `Fourway Xiao` / `KeyEnc Xiao` です（ZMK の上限は15文字）。
 
 共通設定（各 `config/*.conf`）:
 
@@ -41,6 +42,21 @@ XIAO GND --- Encoder C
 ```
 
 キー入力は使わず（overlay 上の D10 は未使用スタブ）、回転のみ。
+
+### key_encoder_xiao
+
+Xiao・キースイッチ・ロータリーエンコーダ（プッシュなし）を1枚に載せた構成です。
+
+```text
+XIAO D0  ---- keyswitch pin1
+XIAO GND ---- keyswitch pin2
+
+XIAO D1  ---- encoder pin1 (A)
+XIAO D2  ---- encoder pin3 (B)
+XIAO GND ---- encoder pin2 (C)
+```
+
+キーは `SPACE`、回転は方向キー Up/Down です。
 
 ### push_encoder_xiao
 
@@ -82,6 +98,8 @@ include:
     shield: push_encoder_xiao
   - board: xiao_ble//zmk
     shield: fourway_xiao
+  - board: xiao_ble//zmk
+    shield: key_encoder_xiao
 ```
 
 成果物（Artifacts の `firmware`）:
@@ -91,6 +109,7 @@ include:
 - `encoder_xiao-xiao_ble__zmk-zmk.uf2`
 - `push_encoder_xiao-xiao_ble__zmk-zmk.uf2`
 - `fourway_xiao-xiao_ble__zmk-zmk.uf2`
+- `key_encoder_xiao-xiao_ble__zmk-zmk.uf2`
 
 ### UF2 書き込み
 
@@ -127,13 +146,15 @@ OS の Bluetooth 設定で上記 BLE 名を選択。`BT_CLR` 等は未割り当�
 │   ├── key_xiao.conf / .keymap
 │   ├── encoder_xiao.conf / .keymap
 │   ├── push_encoder_xiao.conf / .keymap
-│   └── fourway_xiao.conf / .keymap
+│   ├── fourway_xiao.conf / .keymap
+│   └── key_encoder_xiao.conf / .keymap
 ├── boards/shields/
 │   ├── onekey_xiao/
 │   ├── key_xiao/
 │   ├── encoder_xiao/
 │   ├── push_encoder_xiao/
-│   └── fourway_xiao/
+│   ├── fourway_xiao/
+│   └── key_encoder_xiao/
 ├── pcb/
 │   ├── one-key.kicad_pcb
 │   ├── main-board.kicad_pcb

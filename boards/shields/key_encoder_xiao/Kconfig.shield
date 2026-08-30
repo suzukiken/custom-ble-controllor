@@ -1,0 +1,2 @@
+config SHIELD_KEY_ENCODER_XIAO
+	def_bool $(shields_list_contains,key_encoder_xiao)

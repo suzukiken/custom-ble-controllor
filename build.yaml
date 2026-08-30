@@ -9,3 +9,5 @@ include:
     shield: push_encoder_xiao
   - board: xiao_ble//zmk
     shield: fourway_xiao
+  - board: xiao_ble//zmk
+    shield: key_encoder_xiao
