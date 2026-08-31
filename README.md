@@ -100,6 +100,8 @@ XIAO GND --- GND
 
 keymap の並びは A, B, C, D, Push。回転は音量 Up/Down（`steps = 20`）。
 
+RKJXT1F42001 は方向入力時に Push も同時に落ちるため、`rkjxt_xiao` では Push を `&none` にしています（Enter が乗らないようにするため）。中央プッシュが必要なら別途相談してください。
+
 ## ビルド
 
 [`build.yaml`](build.yaml) の全 shield が GitHub Actions（`Build ZMK firmware`）でビルドされます。

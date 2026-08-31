@@ -6,13 +6,16 @@
         compatible = "zmk,keymap";
 
         default_layer {
-            /* A, B, C, D, Push */
+            /* A, B, C, D, Push
+             * RKJXT1F42001 closes Push together with every direction tilt,
+             * so Push is left unbound (&none) to avoid Enter on A/B/C/D.
+             */
             bindings = <
                 &kp UP
                 &kp RIGHT
                 &kp DOWN
                 &kp LEFT
-                &kp ENTER
+                &none
             >;
             sensor-bindings = <&inc_dec_kp C_VOL_UP C_VOL_DN>;
         };
