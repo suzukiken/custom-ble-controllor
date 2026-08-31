@@ -88,12 +88,12 @@ keymap の並びは A, B, C, D, Push。回転は `C_VOL_UP` / `C_VOL_DN`（`step
 Xiao と RKJXT1F42001 を1枚に載せた構成です。
 
 ```text
-XIAO D6 ---- A      → UP
-XIAO D2 ---- B      → RIGHT
-XIAO D0 ---- C      → DOWN
+XIAO D4 ---- A      → UP
+XIAO D0 ---- B      → RIGHT
+XIAO D2 ---- C      → DOWN
 XIAO D3 ---- D      → LEFT
-XIAO D5 ---- Push   → ENTER
-XIAO D4 ---- EA (Encoder A)
+XIAO D5 ---- Push   → (無効 / 方向と同時導通のため)
+XIAO D6 ---- EA (Encoder A)
 XIAO D1 ---- EB (Encoder B)
 XIAO GND --- GND
 ```
