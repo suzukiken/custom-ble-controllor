@@ -1,0 +1,9 @@
+file_format: "1"
+id: rkjxt_xiao
+name: Rkjxt Xiao
+type: shield
+url: https://github.com/zmkfirmware/zmk
+requires: [seeed_xiao]
+features:
+  - keys
+  - encoder

@@ -14,8 +14,9 @@ Board は `xiao_ble//zmk`。ZMK 本体は [`config/west.yml`](config/west.yml) �
 | `push_encoder_xiao` | `main-board` + `push-encoder-board`（PH 4） | D7=A, D6=B, D5=SW, GND=C | Push: `C_MUTE` / 回転: 音量 |
 | `fourway_xiao` | `main-board-8` + `4way-re-board`（8ピン, RKJXT1F42001） | 下表 | 十字・Enter・音量 |
 | `key_encoder_xiao` | Xiao + keyswitch + encoder 一体 | D0=SW / D1=A, D2=B, GND | `SPACE` + 方向キー上下 |
+| `rkjxt_xiao` | Xiao + RKJXT1F42001 一体 | 下表 | 十字・Enter・音量 |
 
-BLE 名はそれぞれ `OneKey Xiao` / `Key Xiao` / `Encoder Xiao` / `PushEnc Xiao` / `Fourway Xiao` / `KeyEnc Xiao` です（ZMK の上限は15文字）。
+BLE 名はそれぞれ `OneKey Xiao` / `Key Xiao` / `Encoder Xiao` / `PushEnc Xiao` / `Fourway Xiao` / `KeyEnc Xiao` / `Rkjxt Xiao` です（ZMK の上限は15文字）。
 
 共通設定（各 `config/*.conf`）:
 
@@ -82,6 +83,23 @@ XIAO GND --- GND (Com / ECom)
 
 keymap の並びは A, B, C, D, Push。回転は `C_VOL_UP` / `C_VOL_DN`（`steps = 20`）。
 
+### rkjxt_xiao
+
+Xiao と RKJXT1F42001 を1枚に載せた構成です。
+
+```text
+XIAO D6 ---- A      → UP
+XIAO D2 ---- B      → RIGHT
+XIAO D0 ---- C      → DOWN
+XIAO D3 ---- D      → LEFT
+XIAO D5 ---- Push   → ENTER
+XIAO D4 ---- EA (Encoder A)
+XIAO D1 ---- EB (Encoder B)
+XIAO GND --- GND
+```
+
+keymap の並びは A, B, C, D, Push。回転は音量 Up/Down（`steps = 20`）。
+
 ## ビルド
 
 [`build.yaml`](build.yaml) の全 shield が GitHub Actions（`Build ZMK firmware`）でビルドされます。
@@ -100,6 +118,8 @@ include:
     shield: fourway_xiao
   - board: xiao_ble//zmk
     shield: key_encoder_xiao
+  - board: xiao_ble//zmk
+    shield: rkjxt_xiao
 ```
 
 成果物（Artifacts の `firmware`）:
@@ -110,6 +130,7 @@ include:
 - `push_encoder_xiao-xiao_ble__zmk-zmk.uf2`
 - `fourway_xiao-xiao_ble__zmk-zmk.uf2`
 - `key_encoder_xiao-xiao_ble__zmk-zmk.uf2`
+- `rkjxt_xiao-xiao_ble__zmk-zmk.uf2`
 
 ### UF2 書き込み
 
@@ -146,15 +167,16 @@ OS の Bluetooth 設定で上記 BLE 名を選択。`BT_CLR` 等は未割り当�
 │   ├── key_xiao.conf / .keymap
 │   ├── encoder_xiao.conf / .keymap
 │   ├── push_encoder_xiao.conf / .keymap
-│   ├── fourway_xiao.conf / .keymap
-│   └── key_encoder_xiao.conf / .keymap
+│   ├── key_encoder_xiao.conf / .keymap
+│   └── rkjxt_xiao.conf / .keymap
 ├── boards/shields/
 │   ├── onekey_xiao/
 │   ├── key_xiao/
 │   ├── encoder_xiao/
 │   ├── push_encoder_xiao/
 │   ├── fourway_xiao/
-│   └── key_encoder_xiao/
+│   ├── key_encoder_xiao/
+│   └── rkjxt_xiao/
 ├── pcb/
 │   ├── one-key.kicad_pcb
 │   ├── main-board.kicad_pcb
