@@ -15,8 +15,9 @@ Board は `xiao_ble//zmk`。ZMK 本体は [`config/west.yml`](config/west.yml) �
 | `fourway_xiao` | `main-board-8` + `4way-re-board`（8ピン, RKJXT1F42001） | 下表 | 十字・Enter・音量 |
 | `key_encoder_xiao` | Xiao + keyswitch + encoder 一体 | D0=SW / D1=A, D2=B, GND | `SPACE` + 方向キー上下 |
 | `rkjxt_xiao` | Xiao + RKJXT1F42001 一体 | 下表 | 十字・Enter・音量 |
+| `batt_test_xiao` | 電池寿命実験用（D0 キーのみ） | D0 ↔ GND | 30秒おきページめくり想定 |
 
-BLE 名はそれぞれ `OneKey Xiao` / `Key Xiao` / `Encoder Xiao` / `PushEnc Xiao` / `Fourway Xiao` / `KeyEnc Xiao` / `Rkjxt Xiao` です（ZMK の上限は15文字）。
+BLE 名はそれぞれ `OneKey Xiao` / `Key Xiao` / `Encoder Xiao` / `PushEnc Xiao` / `Fourway Xiao` / `KeyEnc Xiao` / `Rkjxt Xiao` / `BattTest Xiao` です（ZMK の上限は15文字）。
 
 共通設定（各 `config/*.conf`）:
 
@@ -102,6 +103,42 @@ keymap の並びは A, B, C, D, Push。回転は音量 Up/Down（`steps = 20`）
 
 RKJXT1F42001 は方向入力時に Push も同時に落ちるため、`rkjxt_xiao` では Push を `&none` にしています（Enter が乗らないようにするため）。中央プッシュが必要なら別途相談してください。
 
+### batt_test_xiao（電池持ち実験）
+
+目的は「BLE 接続したまま、約30秒に1回ページめくり相当のキーが出る」ときの持ち時間の見積もりです。
+
+```text
+XIAO D0 ----[ switch or external timer ]---- XIAO GND
+```
+
+- キー: `RIGHT`（Kindle で効かなければ `config/batt_test_xiao.keymap` を `SPACE` に変更）
+- 入力後 **5秒** でスリープ（`CONFIG_ZMK_IDLE_SLEEP_TIMEOUT=5000`）
+- 30秒周期なら、大半の時間はスリープになる想定
+
+#### 実験のやり方
+
+1. LiPo を XIAO の BAT に接続し、この uf2 を書く
+2. iPhone と `BattTest Xiao` をペアリングし、Kindle を開く
+3. **30秒に1回** D0 を GND へ落とす（手押しでも可）
+4. 電池切れ／電源断まで時間を測る
+
+完全自動にしたい場合は、積み重ねた **XIAO RP2040**（[`tester-rp2040`](tester-rp2040/tester-rp2040.ino)）で30秒ごとに D0 を GND へ落とします。RP2040 は USB 電源、nRF52840 は電池、**GND と GPIO だけ共有**（3V3/5V/BAT は繋がない）。
+
+見積もりの目安: `稼働時間 = 満充電から不能になるまでの時間`。  
+手動と自動で周期がずれても、`回数 × 30秒` から換算できます。
+
+## RP2040 キーテスター（Arduino）
+
+電池試験用に、XIAO RP2040 が 30 秒周期で `D0` を 50ms LOW にするファームです。未使用の `D1`–`D10` は Hi-Z のままです。
+
+GitHub Actions [`Build RP2040 tester`](.github/workflows/build-rp2040.yml) が UF2 を出します。
+
+1. Actions の Artifacts から `rp2040-tester-firmware` をダウンロード
+2. XIAO RP2040 で **B を押しながら R**（または B 押しながら挿す）→ `RPI-RP2` ドライブ
+3. `xiao-rp2040-key-tester.uf2` をドラッグ&ドロップ
+
+周期や対象ピンは `tester-rp2040/tester-rp2040.ino` の `INTERVAL_MS` / `TARGET_PIN` で変更できます。
+
 ## ビルド
 
 [`build.yaml`](build.yaml) の全 shield が GitHub Actions（`Build ZMK firmware`）でビルドされます。
@@ -122,6 +159,8 @@ include:
     shield: key_encoder_xiao
   - board: xiao_ble//zmk
     shield: rkjxt_xiao
+  - board: xiao_ble//zmk
+    shield: batt_test_xiao
 ```
 
 成果物（Artifacts の `firmware`）:
@@ -133,6 +172,7 @@ include:
 - `fourway_xiao-xiao_ble__zmk-zmk.uf2`
 - `key_encoder_xiao-xiao_ble__zmk-zmk.uf2`
 - `rkjxt_xiao-xiao_ble__zmk-zmk.uf2`
+- `batt_test_xiao-xiao_ble__zmk-zmk.uf2`
 
 ### UF2 書き込み
 
@@ -159,10 +199,14 @@ OS の Bluetooth 設定で上記 BLE 名を選択。`BT_CLR` 等は未割り当�
 
 ```text
 .
-├── .github/workflows/build.yml
+├── .github/workflows/
+│   ├── build.yml          # ZMK
+│   └── build-rp2040.yml   # XIAO RP2040 key tester
 ├── .gitignore
 ├── build.yaml
 ├── README.md
+├── tester-rp2040/
+│   └── tester-rp2040.ino
 ├── config/
 │   ├── west.yml
 │   ├── onekey_xiao.conf / .keymap
@@ -170,7 +214,8 @@ OS の Bluetooth 設定で上記 BLE 名を選択。`BT_CLR` 等は未割り当�
 │   ├── encoder_xiao.conf / .keymap
 │   ├── push_encoder_xiao.conf / .keymap
 │   ├── key_encoder_xiao.conf / .keymap
-│   └── rkjxt_xiao.conf / .keymap
+│   ├── rkjxt_xiao.conf / .keymap
+│   └── batt_test_xiao.conf / .keymap
 ├── boards/shields/
 │   ├── onekey_xiao/
 │   ├── key_xiao/
@@ -178,7 +223,8 @@ OS の Bluetooth 設定で上記 BLE 名を選択。`BT_CLR` 等は未割り当�
 │   ├── push_encoder_xiao/
 │   ├── fourway_xiao/
 │   ├── key_encoder_xiao/
-│   └── rkjxt_xiao/
+│   ├── rkjxt_xiao/
+│   └── batt_test_xiao/
 ├── pcb/
 │   ├── one-key.kicad_pcb
 │   ├── main-board.kicad_pcb

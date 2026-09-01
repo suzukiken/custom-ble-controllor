@@ -1,0 +1,6 @@
+if SHIELD_BATT_TEST_XIAO
+
+config ZMK_KEYBOARD_NAME
+	default "BattTest Xiao"
+
+endif
