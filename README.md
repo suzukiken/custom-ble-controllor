@@ -129,7 +129,7 @@ XIAO D0 ----[ switch or external timer ]---- XIAO GND
 
 ## RP2040 キーテスター（Arduino）
 
-電池試験用に、XIAO RP2040 が 30 秒周期で `D0` を 50ms LOW にするファームです。未使用の `D1`–`D10` は Hi-Z のままです。
+電池試験用に、XIAO RP2040 が 30 秒周期で `D0` を **500ms** LOW にするファームです（nRF のスリープ復帰＋デバウンス用。短すぎると手動短絡は成功しても自動は失敗しやすい）。未使用の `D1`–`D10` は Hi-Z のままです。パルス時は赤 LED が点灯します。
 
 GitHub Actions [`Build RP2040 tester`](.github/workflows/build-rp2040.yml) が UF2 を出します。
 
