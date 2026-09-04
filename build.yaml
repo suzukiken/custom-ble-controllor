@@ -15,3 +15,5 @@ include:
     shield: rkjxt_xiao
   - board: xiao_ble//zmk
     shield: batt_test_xiao
+  - board: xiao_ble//zmk
+    shield: settings_reset

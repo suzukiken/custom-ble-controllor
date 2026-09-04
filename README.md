@@ -161,6 +161,8 @@ include:
     shield: rkjxt_xiao
   - board: xiao_ble//zmk
     shield: batt_test_xiao
+  - board: xiao_ble//zmk
+    shield: settings_reset
 ```
 
 成果物（Artifacts の `firmware`）:
@@ -173,6 +175,7 @@ include:
 - `key_encoder_xiao-xiao_ble__zmk-zmk.uf2`
 - `rkjxt_xiao-xiao_ble__zmk-zmk.uf2`
 - `batt_test_xiao-xiao_ble__zmk-zmk.uf2`
+- `settings_reset-xiao_ble__zmk-zmk.uf2`（BLE ペアリング復旧用）
 
 ### UF2 書き込み
 
