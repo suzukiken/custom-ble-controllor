@@ -11,3 +11,7 @@ include:
     shield: fourway_xiao
   - board: xiao_ble//zmk
     shield: key_encoder_xiao
+  - board: xiao_ble//zmk
+    shield: rkjxt_xiao
+  - board: xiao_ble//zmk
+    shield: batt_test_xiao

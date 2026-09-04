@@ -1,5 +1,6 @@
-/.west/
 /build/
+/tester-rp2040/build/
+/out/
 /modules/
 /tools/
 /zephyr/*
