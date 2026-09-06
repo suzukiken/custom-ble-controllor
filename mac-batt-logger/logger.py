@@ -26,6 +26,7 @@ from bleak.backends.scanner import AdvertisementData
 
 # Nordic UART Service (Adafruit BLEUart)
 NUS_SERVICE = UUID("6e400001-b5a3-f393-e0a9-e50e24dcca9e")
+NUS_RX_CHAR = "6e400002-b5a3-f393-e0a9-e50e24dcca9e"  # write (host → device)
 NUS_TX_CHAR = "6e400003-b5a3-f393-e0a9-e50e24dcca9e"  # notify (device → host)
 DEFAULT_NAME = "BattMon Xiao"
 LINE_RE = re.compile(
@@ -168,10 +169,31 @@ async def run(
             async with BleakClient(device, timeout=30.0) as client:
                 if not client.is_connected:
                     raise RuntimeError("connect failed")
-                print("Connected. Waiting for notifications…", flush=True)
+                print("Connected. Enabling notifications…", flush=True)
                 await client.start_notify(NUS_TX_CHAR, on_notify)
+                # Ask firmware to send immediately (any RX byte triggers a sample).
+                await asyncio.sleep(0.3)
+                try:
+                    await client.write_gatt_char(NUS_RX_CHAR, b"poll\n", response=False)
+                    print("Polled device for a sample.", flush=True)
+                except Exception as write_exc:  # noqa: BLE001
+                    print(f"# poll write failed: {write_exc!r}", flush=True)
+                waited = 0
                 while client.is_connected:
                     await asyncio.sleep(1.0)
+                    waited += 1
+                    if waited % 15 == 0:
+                        print(
+                            f"# still waiting for notify… ({waited}s). "
+                            "If red LED never flashes, reflash the latest UF2.",
+                            flush=True,
+                        )
+                        try:
+                            await client.write_gatt_char(
+                                NUS_RX_CHAR, b"poll\n", response=False
+                            )
+                        except Exception:
+                            pass
         except asyncio.CancelledError:
             raise
         except Exception as exc:  # noqa: BLE001 — keep logger alive

@@ -1,54 +1,53 @@
 /*
  * XIAO nRF52840 battery telemetry (no sleep).
  *
- * Every INTERVAL_MS (and on BLE connect), send via Nordic UART Service:
+ * Every INTERVAL_MS after connect (and when Mac writes any NUS RX byte),
+ * send via Nordic UART Service:
  *   uptime_s=<sec> percent=<0-100> voltage_mv=<mv>\n
  *
- * Board package: Seeed nRF52 Boards → "Seeed XIAO nRF52840"
- * (Adafruit Bluefruit). Flash as UF2 (double-reset → XIAO-SENSE / XIAO BLE).
+ * IMPORTANT: never delay()/ADC inside Bluefruit callbacks — SoftDevice hangs.
  *
- * Power from LiPo on BAT+. Keep USB unplugged during long runs if you want
- * true battery drain; USB present will charge and skew voltage.
+ * Board: Seeed nRF52 Boards → "Seeed XIAO nRF52840". Flash as UF2.
  */
 
 #include <Adafruit_TinyUSB.h>
 #include <bluefruit.h>
 
-constexpr uint32_t INTERVAL_MS = 10UL * 60UL * 1000UL; // 10 minutes
+constexpr uint32_t INTERVAL_MS = 30UL * 1000UL; // 30s bring-up; later → 10 min
+constexpr uint32_t FIRST_SEND_DELAY_MS = 1500UL;
 constexpr char DEVICE_NAME[] = "BattMon Xiao";
 
-// XIAO nRF52840 battery sense (Seeed / forum convention)
 #ifndef PIN_VBAT
 #define PIN_VBAT 32
 #endif
 #ifndef PIN_VBAT_ENABLE
-#define PIN_VBAT_ENABLE VBAT_ENABLE // 14 on Seeed XIAO nRF52840
+#define PIN_VBAT_ENABLE VBAT_ENABLE
 #endif
 
 BLEUart bleuart;
 
 static uint32_t g_boot_ms = 0;
+static uint32_t g_conn_ms = 0;
 static uint32_t g_last_send_ms = 0;
+static volatile bool g_connected = false;
+static volatile bool g_poll_requested = false;
 static bool g_sent_this_conn = false;
 
 static float readBatteryVolts() {
-  // Divider always enabled (safe while measuring / charging per Seeed Q3).
   digitalWrite(PIN_VBAT_ENABLE, LOW);
-  delay(5);
+  delay(2);
 
   uint32_t sum = 0;
-  constexpr int SAMPLES = 8;
+  constexpr int SAMPLES = 4;
   for (int i = 0; i < SAMPLES; i++) {
     sum += analogRead(PIN_VBAT);
-    delay(2);
+    delay(1);
   }
   const float adc = sum / float(SAMPLES);
-  // msfujino: ratio ~2.961, Vref 3.6V, 12-bit ADC
   return 2.961f * 3.6f * adc / 4096.0f;
 }
 
 static uint8_t percentFromMv(uint16_t mv) {
-  // Coarse 1S LiPo open-circuit-ish curve (not coulomb counting).
   static const struct {
     uint16_t mv;
     uint8_t pct;
@@ -79,10 +78,13 @@ static uint8_t percentFromMv(uint16_t mv) {
 }
 
 static void sendTelemetry() {
+  // Flash first so we can see attempts even if ADC/BLE write misbehaves.
+  digitalWrite(LED_RED, LOW);
+
   const uint32_t uptime_s = (millis() - g_boot_ms) / 1000UL;
   const float volts = readBatteryVolts();
   uint16_t mv = 0;
-  if (volts > 0.0f) {
+  if (volts > 0.0f && volts < 6.0f) {
     mv = (uint16_t)(volts * 1000.0f + 0.5f);
   }
   const uint8_t pct = percentFromMv(mv);
@@ -93,26 +95,38 @@ static void sendTelemetry() {
            (unsigned long)uptime_s, (unsigned)pct, (unsigned)mv);
 
   if (Bluefruit.connected()) {
-    bleuart.write((const uint8_t *)line, strlen(line));
+    bleuart.print(line);
   }
 
-  // Red LED flash = sample sent (active-low on XIAO)
-  digitalWrite(LED_RED, LOW);
-  delay(40);
+  delay(60);
   digitalWrite(LED_RED, HIGH);
 
   g_last_send_ms = millis();
+  g_sent_this_conn = true;
+}
+
+// Callbacks: flags only — no delay/ADC/print here.
+static void bleuart_rx_callback(uint16_t conn_hdl) {
+  (void)conn_hdl;
+  while (bleuart.available()) {
+    (void)bleuart.read();
+  }
+  g_poll_requested = true;
 }
 
 static void connect_callback(uint16_t conn_hdl) {
   (void)conn_hdl;
-  // Do not send here — Mac has not enabled notifications yet.
+  g_connected = true;
+  g_conn_ms = millis();
   g_sent_this_conn = false;
+  g_poll_requested = false;
 }
 
 static void disconnect_callback(uint16_t conn_hdl, uint8_t reason) {
   (void)conn_hdl;
   (void)reason;
+  g_connected = false;
+  g_poll_requested = false;
   g_sent_this_conn = false;
   Bluefruit.Advertising.start(0);
 }
@@ -120,6 +134,8 @@ static void disconnect_callback(uint16_t conn_hdl, uint8_t reason) {
 void setup() {
   pinMode(LED_RED, OUTPUT);
   digitalWrite(LED_RED, HIGH);
+  pinMode(LED_GREEN, OUTPUT);
+  digitalWrite(LED_GREEN, HIGH);
   pinMode(LED_BLUE, OUTPUT);
   digitalWrite(LED_BLUE, HIGH);
 
@@ -127,7 +143,7 @@ void setup() {
   digitalWrite(PIN_VBAT_ENABLE, LOW);
   pinMode(PIN_VBAT, INPUT);
 
-  analogReference(AR_DEFAULT); // 0.6V * 6 = 3.6V
+  analogReference(AR_DEFAULT);
   analogReadResolution(12);
 
   g_boot_ms = millis();
@@ -139,48 +155,54 @@ void setup() {
   Bluefruit.Periph.setDisconnectCallback(disconnect_callback);
 
   bleuart.begin();
+  bleuart.setRxCallback(bleuart_rx_callback);
 
-  // Put the name in the primary ADV packet so macOS/bleak sees it without
-  // relying on scan-response timing. NUS UUID goes in the scan response.
   Bluefruit.Advertising.addFlags(BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE);
   Bluefruit.Advertising.addTxPower();
   Bluefruit.Advertising.addName();
   Bluefruit.ScanResponse.addService(bleuart);
   Bluefruit.Advertising.restartOnDisconnect(true);
-  Bluefruit.Advertising.setInterval(32, 244); // 20ms .. 152.5ms
+  Bluefruit.Advertising.setInterval(32, 244);
   Bluefruit.Advertising.setFastTimeout(30);
   Bluefruit.Advertising.start(0);
-
-  // Slow blue blink while advertising (stops when connected / sample flash).
-  digitalWrite(LED_BLUE, LOW);
-  delay(80);
-  digitalWrite(LED_BLUE, HIGH);
-
-  g_last_send_ms = millis();
 }
 
 void loop() {
-  // No System OFF / no deep sleep — SoftDevice stays up for BLE.
-  if (Bluefruit.connected()) {
-    // Wait until the host enables NUS notifications, then send immediately
-    // and every INTERVAL_MS after that.
-    if (bleuart.notifyEnabled()) {
-      const uint32_t now = millis();
-      if (!g_sent_this_conn || (now - g_last_send_ms) >= INTERVAL_MS) {
-        sendTelemetry();
-        g_sent_this_conn = true;
-      }
+  const uint32_t now = millis();
+
+  if (g_connected && Bluefruit.connected()) {
+    // Green heartbeat while connected (proves loop is alive).
+    static uint32_t last_hb = 0;
+    if (now - last_hb >= 1000) {
+      last_hb = now;
+      digitalWrite(LED_GREEN, LOW);
+      delay(20);
+      digitalWrite(LED_GREEN, HIGH);
+    }
+
+    bool due = false;
+    if (g_poll_requested) {
+      g_poll_requested = false;
+      due = true;
+    } else if (!g_sent_this_conn && (now - g_conn_ms >= FIRST_SEND_DELAY_MS)) {
+      due = true;
+    } else if (g_sent_this_conn && (now - g_last_send_ms >= INTERVAL_MS)) {
+      due = true;
+    }
+
+    if (due) {
+      sendTelemetry();
     }
   } else {
-    // Heartbeat: advertising alive
-    static uint32_t last_hb = 0;
-    const uint32_t now = millis();
-    if (now - last_hb >= 2000) {
-      last_hb = now;
+    g_connected = false;
+    static uint32_t last_adv = 0;
+    if (now - last_adv >= 2000) {
+      last_adv = now;
       digitalWrite(LED_BLUE, LOW);
       delay(30);
       digitalWrite(LED_BLUE, HIGH);
     }
   }
-  delay(100);
+
+  delay(20);
 }

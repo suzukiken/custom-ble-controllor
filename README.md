@@ -141,7 +141,7 @@ GitHub Actions [`Build RP2040 tester`](.github/workflows/build-rp2040.yml) が U
 
 ## バッテリー監視（スリープなし / Mac ロガー）
 
-ZMK ではなく **Arduino（Seeed nRF52 / Bluefruit）** の専用ファームです。スリープせず、BLE Nordic UART で起動からの経過時間・推定残量・電圧を約 **10分** ごとに送ります。
+ZMK ではなく **Arduino（Seeed nRF52 / Bluefruit）** の専用ファームです。スリープせず、BLE Nordic UART で起動からの経過時間・推定残量・電圧を約 **30秒** ごとに送ります（動作確認用。本番は `INTERVAL_MS` を 10 分に戻せる）。
 
 | 側 | 場所 |
 | --- | --- |
@@ -159,7 +159,7 @@ uptime_s=600 percent=87 voltage_mv=3921
 1. Actions [`Build batt monitor`](.github/workflows/build-batt-monitor.yml) の Artifact `batt-monitor-firmware` から `xiao-nrf52840-batt-monitor.uf2` を取得  
    （または Arduino IDE: Board = **Seeed XIAO nRF52840** / Seeed nRF52 Boards）
 2. XIAO nRF52840 を `RST` 素早く2回 → ブートローダーへ UF2 をコピー
-3. BLE 名は `BattMon Xiao`。送信時に赤 LED が短く点灯
+3. BLE 名は `BattMon Xiao`。未接続時は青 LED 点滅、接続中は緑 LED が約1秒ごと、送信時は赤 LED が点灯
 
 LiPo は BAT+ / GND に接続。長時間の持ち測定では USB を抜く（挿したままだと充電され電圧が歪む）。
 
@@ -175,7 +175,7 @@ pip install -r requirements.txt
 python logger.py -o ~/Desktop/batt-monitor-log.tsv
 ```
 
-- 接続直後に1回、その後約10分ごとに追記
+- 接続後すぐ（＋ Mac からの poll）、その後約30秒ごとに追記
 - `batt-monitor-log.tsv` … 履歴（TSV）
 - `batt-monitor-log-latest.tsv` … 最新1件だけ上書き
 - 切断時は自動再スキャン／再接続
