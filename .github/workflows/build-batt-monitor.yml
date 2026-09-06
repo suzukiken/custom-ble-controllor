@@ -24,6 +24,11 @@ jobs:
       - name: Install Seeed nRF52 core
         run: |
           sudo ln -sf "$(which python3)" /usr/local/bin/python
+          # Seeed/Adafruit post-link step packages a DFU zip via adafruit-nrfutil.
+          python3 -m pip install --user --break-system-packages adafruit-nrfutil
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          export PATH="$HOME/.local/bin:$PATH"
+          command -v adafruit-nrfutil
           arduino-cli config init
           arduino-cli config add board_manager.additional_urls \
             https://files.seeedstudio.com/arduino/package_seeeduino_boards_index.json
