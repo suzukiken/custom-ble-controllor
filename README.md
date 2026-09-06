@@ -139,6 +139,49 @@ GitHub Actions [`Build RP2040 tester`](.github/workflows/build-rp2040.yml) が U
 
 周期や対象ピンは `tester-rp2040/tester-rp2040.ino` の `INTERVAL_MS` / `TARGET_PIN` で変更できます。
 
+## バッテリー監視（スリープなし / Mac ロガー）
+
+ZMK ではなく **Arduino（Seeed nRF52 / Bluefruit）** の専用ファームです。スリープせず、BLE Nordic UART で起動からの経過時間・推定残量・電圧を約 **10分** ごとに送ります。
+
+| 側 | 場所 |
+| --- | --- |
+| ファーム | [`batt_monitor_xiao/`](batt_monitor_xiao/batt_monitor_xiao.ino) |
+| Mac ロガー | [`mac-batt-logger/`](mac-batt-logger/logger.py) |
+
+送信例（1行）:
+
+```text
+uptime_s=600 percent=87 voltage_mv=3921
+```
+
+### ファーム書き込み
+
+1. Actions [`Build batt monitor`](.github/workflows/build-batt-monitor.yml) の Artifact `batt-monitor-firmware` から `xiao-nrf52840-batt-monitor.uf2` を取得  
+   （または Arduino IDE: Board = **Seeed XIAO nRF52840** / Seeed nRF52 Boards）
+2. XIAO nRF52840 を `RST` 素早く2回 → ブートローダーへ UF2 をコピー
+3. BLE 名は `BattMon Xiao`。送信時に赤 LED が短く点灯
+
+LiPo は BAT+ / GND に接続。長時間の持ち測定では USB を抜く（挿したままだと充電され電圧が歪む）。
+
+### Mac 側（Python）
+
+Bluetooth 権限がオンの macOS で:
+
+```bash
+cd mac-batt-logger
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python logger.py -o ~/Desktop/batt-monitor-log.tsv
+```
+
+- 接続直後に1回、その後約10分ごとに追記
+- `batt-monitor-log.tsv` … 履歴（TSV）
+- `batt-monitor-log-latest.tsv` … 最新1件だけ上書き
+- 切断時は自動再スキャン／再接続
+
+OS の「Bluetooth」設定でデバイスをペアリングする必要はありません（ロガーが直接 GATT 接続します）。
+
 ## ビルド
 
 [`build.yaml`](build.yaml) の全 shield が GitHub Actions（`Build ZMK firmware`）でビルドされます。
@@ -203,11 +246,17 @@ OS の Bluetooth 設定で上記 BLE 名を選択。`BT_CLR` 等は未割り当�
 ```text
 .
 ├── .github/workflows/
-│   ├── build.yml          # ZMK
-│   └── build-rp2040.yml   # XIAO RP2040 key tester
+│   ├── build.yml                 # ZMK
+│   ├── build-rp2040.yml          # XIAO RP2040 key tester
+│   └── build-batt-monitor.yml    # XIAO nRF52840 battery monitor
 ├── .gitignore
 ├── build.yaml
 ├── README.md
+├── batt_monitor_xiao/
+│   └── batt_monitor_xiao.ino
+├── mac-batt-logger/
+│   ├── logger.py
+│   └── requirements.txt
 ├── tester-rp2040/
 │   └── tester-rp2040.ino
 ├── config/
