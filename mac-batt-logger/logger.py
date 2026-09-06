@@ -106,7 +106,10 @@ async def find_device(
         label = device_label(device, adv)
         uuids = {_norm_uuid(u) for u in (adv.service_uuids or [])}
         seen[device.address] = (label or "(no name)", ",".join(sorted(uuids)) or "-")
-        if label.casefold() == target or short in label.casefold():
+        label_cf = label.casefold()
+        # Prefer real BattMon name. macOS often caches an old name (e.g. OneKey)
+        # for a re-flashed board — then NUS UUID is the reliable signal.
+        if label_cf == target or short in label_cf:
             return True
         return nus in uuids
 
@@ -118,15 +121,19 @@ async def find_device(
                 print(f"#   {addr}  name={label!r}  uuids={uuids}", flush=True)
         raise RuntimeError(
             f"Device {name!r} not found.\n"
-            "Check: UF2 flashed, board powered, red LED can blink, "
+            "Check: UF2 flashed, board powered, blue LED blinking while idle, "
             "macOS Bluetooth on, and Terminal has Bluetooth permission "
             "(System Settings → Privacy & Security → Bluetooth).\n"
             "Retry with --address <uuid> from the scan dump above."
         )
-    print(
-        f"Found {device.name or '(no name)'}  address={device.address}",
-        flush=True,
-    )
+    shown = device.name or "(no name)"
+    print(f"Found {shown}  address={device.address}", flush=True)
+    if "battmon" not in shown.casefold():
+        print(
+            "# note: displayed name is not BattMon — macOS may be caching an old "
+            "name for this board. Continuing because NUS/BattMon match succeeded.",
+            flush=True,
+        )
     return device
 
 

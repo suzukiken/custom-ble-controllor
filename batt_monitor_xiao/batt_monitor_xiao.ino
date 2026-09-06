@@ -29,6 +29,7 @@ BLEUart bleuart;
 
 static uint32_t g_boot_ms = 0;
 static uint32_t g_last_send_ms = 0;
+static bool g_sent_this_conn = false;
 
 static float readBatteryVolts() {
   // Divider always enabled (safe while measuring / charging per Seeed Q3).
@@ -105,13 +106,14 @@ static void sendTelemetry() {
 
 static void connect_callback(uint16_t conn_hdl) {
   (void)conn_hdl;
-  // Immediate sample so Mac can confirm the link without waiting 10 min.
-  sendTelemetry();
+  // Do not send here — Mac has not enabled notifications yet.
+  g_sent_this_conn = false;
 }
 
 static void disconnect_callback(uint16_t conn_hdl, uint8_t reason) {
   (void)conn_hdl;
   (void)reason;
+  g_sent_this_conn = false;
   Bluefruit.Advertising.start(0);
 }
 
@@ -160,9 +162,14 @@ void setup() {
 void loop() {
   // No System OFF / no deep sleep — SoftDevice stays up for BLE.
   if (Bluefruit.connected()) {
-    const uint32_t now = millis();
-    if ((now - g_last_send_ms) >= INTERVAL_MS) {
-      sendTelemetry();
+    // Wait until the host enables NUS notifications, then send immediately
+    // and every INTERVAL_MS after that.
+    if (bleuart.notifyEnabled()) {
+      const uint32_t now = millis();
+      if (!g_sent_this_conn || (now - g_last_send_ms) >= INTERVAL_MS) {
+        sendTelemetry();
+        g_sent_this_conn = true;
+      }
     }
   } else {
     // Heartbeat: advertising alive
