@@ -118,6 +118,8 @@ static void disconnect_callback(uint16_t conn_hdl, uint8_t reason) {
 void setup() {
   pinMode(LED_RED, OUTPUT);
   digitalWrite(LED_RED, HIGH);
+  pinMode(LED_BLUE, OUTPUT);
+  digitalWrite(LED_BLUE, HIGH);
 
   pinMode(PIN_VBAT_ENABLE, OUTPUT);
   digitalWrite(PIN_VBAT_ENABLE, LOW);
@@ -136,14 +138,21 @@ void setup() {
 
   bleuart.begin();
 
+  // Put the name in the primary ADV packet so macOS/bleak sees it without
+  // relying on scan-response timing. NUS UUID goes in the scan response.
   Bluefruit.Advertising.addFlags(BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE);
   Bluefruit.Advertising.addTxPower();
-  Bluefruit.Advertising.addService(bleuart);
-  Bluefruit.ScanResponse.addName();
+  Bluefruit.Advertising.addName();
+  Bluefruit.ScanResponse.addService(bleuart);
   Bluefruit.Advertising.restartOnDisconnect(true);
   Bluefruit.Advertising.setInterval(32, 244); // 20ms .. 152.5ms
   Bluefruit.Advertising.setFastTimeout(30);
   Bluefruit.Advertising.start(0);
+
+  // Slow blue blink while advertising (stops when connected / sample flash).
+  digitalWrite(LED_BLUE, LOW);
+  delay(80);
+  digitalWrite(LED_BLUE, HIGH);
 
   g_last_send_ms = millis();
 }
@@ -154,6 +163,16 @@ void loop() {
     const uint32_t now = millis();
     if ((now - g_last_send_ms) >= INTERVAL_MS) {
       sendTelemetry();
+    }
+  } else {
+    // Heartbeat: advertising alive
+    static uint32_t last_hb = 0;
+    const uint32_t now = millis();
+    if (now - last_hb >= 2000) {
+      last_hb = now;
+      digitalWrite(LED_BLUE, LOW);
+      delay(30);
+      digitalWrite(LED_BLUE, HIGH);
     }
   }
   delay(100);

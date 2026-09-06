@@ -179,8 +179,12 @@ python logger.py -o ~/Desktop/batt-monitor-log.tsv
 - `batt-monitor-log.tsv` … 履歴（TSV）
 - `batt-monitor-log-latest.tsv` … 最新1件だけ上書き
 - 切断時は自動再スキャン／再接続
+- 見つからないときはスキャンで見えたデバイス一覧を出す。`--address` で直接接続も可
 
-OS の「Bluetooth」設定でデバイスをペアリングする必要はありません（ロガーが直接 GATT 接続します）。
+OS の「Bluetooth」設定でデバイスをペアリングする必要はありません（ロガーが直接 GATT 接続します）。  
+Terminal / iTerm に **Bluetooth 権限**が必要です（システム設定 → プライバシーとセキュリティ → Bluetooth）。
+
+ファーム書き込み後、未接続時は青 LED が約2秒ごとに点滅します（広告中の心拍）。
 
 ## ビルド
 

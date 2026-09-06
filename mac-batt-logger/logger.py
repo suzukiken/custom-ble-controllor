@@ -5,7 +5,7 @@ Receive BattMon Xiao Nordic UART telemetry and keep a local text log updated.
 Firmware line format:
   uptime_s=<sec> percent=<0-100> voltage_mv=<mv>\\n
 
-Log file (TSV, appended each sample; also rewritten as *-latest.txt):
+Log file (TSV, appended each sample; also rewritten as *-latest.tsv):
   host_iso\\tuptime_s\\tpercent\\tvoltage_mv
 """
 
@@ -17,6 +17,7 @@ import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+from uuid import UUID
 
 from bleak import BleakClient, BleakScanner
 from bleak.backends.characteristic import BleakGATTCharacteristic
@@ -24,7 +25,7 @@ from bleak.backends.device import BLEDevice
 from bleak.backends.scanner import AdvertisementData
 
 # Nordic UART Service (Adafruit BLEUart)
-NUS_SERVICE = "6e400001-b5a3-f393-e0a9-e50e24dcca9e"
+NUS_SERVICE = UUID("6e400001-b5a3-f393-e0a9-e50e24dcca9e")
 NUS_TX_CHAR = "6e400003-b5a3-f393-e0a9-e50e24dcca9e"  # notify (device → host)
 DEFAULT_NAME = "BattMon Xiao"
 LINE_RE = re.compile(
@@ -42,6 +43,18 @@ def parse_line(text: str) -> tuple[int, int, int] | None:
     if not m:
         return None
     return int(m.group(1)), int(m.group(2)), int(m.group(3))
+
+
+def _norm_uuid(value: object) -> str:
+    return str(value).lower()
+
+
+def device_label(device: BLEDevice, adv: AdvertisementData | None = None) -> str:
+    if device.name:
+        return device.name
+    if adv and adv.local_name:
+        return adv.local_name
+    return ""
 
 
 class FileSink:
@@ -66,28 +79,68 @@ class FileSink:
         print(row.rstrip(), flush=True)
 
 
-async def find_device(name: str, timeout: float) -> BLEDevice:
-    print(f"Scanning for {name!r} (timeout {timeout:.0f}s)…", flush=True)
+async def find_device(
+    name: str,
+    timeout: float,
+    address: str | None = None,
+) -> BLEDevice:
+    target = name.casefold()
+    short = "battmon"
+    nus = str(NUS_SERVICE).lower()
+
+    if address:
+        print(f"Looking up address {address}…", flush=True)
+        device = await BleakScanner.find_device_by_address(address, timeout=timeout)
+        if device is None:
+            raise RuntimeError(f"No device at address {address!r}")
+        print(f"Found {device.name or '(no name)'}  address={device.address}", flush=True)
+        return device
+
+    print(
+        f"Scanning for name {name!r} or NUS UUID (timeout {timeout:.0f}s)…",
+        flush=True,
+    )
+    seen: dict[str, tuple[str, str]] = {}
 
     def match(device: BLEDevice, adv: AdvertisementData) -> bool:
-        label = device.name or adv.local_name or ""
-        return label == name
+        label = device_label(device, adv)
+        uuids = {_norm_uuid(u) for u in (adv.service_uuids or [])}
+        seen[device.address] = (label or "(no name)", ",".join(sorted(uuids)) or "-")
+        if label.casefold() == target or short in label.casefold():
+            return True
+        return nus in uuids
 
     device = await BleakScanner.find_device_by_filter(match, timeout=timeout)
     if device is None:
+        if seen:
+            print("# devices seen during scan:", flush=True)
+            for addr, (label, uuids) in sorted(seen.items()):
+                print(f"#   {addr}  name={label!r}  uuids={uuids}", flush=True)
         raise RuntimeError(
-            f"Device {name!r} not found. Is BattMon Xiao advertising nearby?"
+            f"Device {name!r} not found.\n"
+            "Check: UF2 flashed, board powered, red LED can blink, "
+            "macOS Bluetooth on, and Terminal has Bluetooth permission "
+            "(System Settings → Privacy & Security → Bluetooth).\n"
+            "Retry with --address <uuid> from the scan dump above."
         )
-    print(f"Found {device.name}  address={device.address}", flush=True)
+    print(
+        f"Found {device.name or '(no name)'}  address={device.address}",
+        flush=True,
+    )
     return device
 
 
-async def run(name: str, out: Path, scan_timeout: float) -> None:
+async def run(
+    name: str,
+    out: Path,
+    scan_timeout: float,
+    address: str | None,
+) -> None:
     sink = FileSink(out)
     buffer = ""
 
     while True:
-        device = await find_device(name, scan_timeout)
+        device = await find_device(name, scan_timeout, address)
 
         def on_notify(_: BleakGATTCharacteristic, data: bytearray) -> None:
             nonlocal buffer
@@ -135,6 +188,12 @@ def main() -> int:
         help=f"BLE advertised name (default: {DEFAULT_NAME})",
     )
     p.add_argument(
+        "-a",
+        "--address",
+        default=None,
+        help="Connect by CoreBluetooth UUID / address (skip name match)",
+    )
+    p.add_argument(
         "--scan-timeout",
         type=float,
         default=30.0,
@@ -142,7 +201,7 @@ def main() -> int:
     )
     args = p.parse_args()
     try:
-        asyncio.run(run(args.name, args.output, args.scan_timeout))
+        asyncio.run(run(args.name, args.output, args.scan_timeout, args.address))
     except KeyboardInterrupt:
         print("\nStopped.", flush=True)
         return 0
