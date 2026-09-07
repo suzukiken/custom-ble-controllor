@@ -192,6 +192,24 @@ Terminal / iTerm に **Bluetooth 権限**が必要です（システム設定 �
 
 ファーム書き込み後、起動時に赤→緑→青のセルフテストがあり、送信時だけ赤 LED が点灯します。Reflash 後に GATT が古い場合は Bluetooth を一度オフ／オンしてください。
 
+## 電源ボタン（System OFF）
+
+D0–GND のスイッチで nRF52840 の **System OFF** を入切する Arduino ファームです。
+
+| 操作 | 動作 |
+| --- | --- |
+| System OFF 中に押して **1秒長押し** | ON（途中で離すと再び System OFF） |
+| ON 中に **3秒長押し** → 離す | System OFF |
+
+```text
+XIAO D0 ----[ switch ]---- XIAO GND
+```
+
+- ファーム: [`powerbtn_xiao/`](powerbtn_xiao/powerbtn_xiao.ino)
+- Actions [`Build power button`](.github/workflows/build-powerbtn.yml) → `xiao-nrf52840-powerbtn.uf2`
+- USB 接続中は 1秒 ON 確認を省略（書き込み・デバッグ用）
+- LED: ON 確認中は青点滅、OFF 長押し中は赤点滅（待機中は消灯）
+
 ## ビルド
 
 [`build.yaml`](build.yaml) の全 shield が GitHub Actions（`Build ZMK firmware`）でビルドされます。
@@ -258,12 +276,15 @@ OS の Bluetooth 設定で上記 BLE 名を選択。`BT_CLR` 等は未割り当�
 ├── .github/workflows/
 │   ├── build.yml                 # ZMK
 │   ├── build-rp2040.yml          # XIAO RP2040 key tester
-│   └── build-batt-monitor.yml    # XIAO nRF52840 battery monitor
+│   ├── build-batt-monitor.yml    # XIAO nRF52840 battery monitor
+│   └── build-powerbtn.yml        # XIAO nRF52840 System OFF power button
 ├── .gitignore
 ├── build.yaml
 ├── README.md
 ├── batt_monitor_xiao/
 │   └── batt_monitor_xiao.ino
+├── powerbtn_xiao/
+│   └── powerbtn_xiao.ino
 ├── mac-batt-logger/
 │   ├── logger.py
 │   └── requirements.txt
