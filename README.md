@@ -17,8 +17,9 @@ Board は `xiao_ble//zmk`。ZMK 本体は [`config/west.yml`](config/west.yml) �
 | `rkjxt_xiao` | Xiao + RKJXT1F42001 一体 | 下表 | 十字・Enter・音量 |
 | `batt_test_xiao` | 電池寿命実験用（D0 キーのみ） | D0 ↔ GND | 30秒おきページめくり想定 |
 | `powerbtn_xiao` | 電源ボタン（ZMK Soft Off） | D0 ↔ GND | 3秒長押しで System OFF / 押して起動 |
+| `batt_1hz_xiao` | 電池 soak（RP2040 積み） | D0–D9=0–9 / D10=Enter | 約1秒に1打・行数で稼働時間 |
 
-BLE 名はそれぞれ `OneKey Xiao` / `Key Xiao` / `Encoder Xiao` / `PushEnc Xiao` / `Fourway Xiao` / `KeyEnc Xiao` / `Rkjxt Xiao` / `BattTest Xiao` / `PowerBtn Xiao` です（ZMK の上限は15文字）。
+BLE 名はそれぞれ `OneKey Xiao` / `Key Xiao` / `Encoder Xiao` / `PushEnc Xiao` / `Fourway Xiao` / `KeyEnc Xiao` / `Rkjxt Xiao` / `BattTest Xiao` / `PowerBtn Xiao` / `Batt1Hz Xiao` です（ZMK の上限は15文字）。
 
 共通設定（各 `config/*.conf`）:
 
@@ -136,6 +137,31 @@ XIAO D0 ----[ switch or external timer ]---- XIAO GND
 見積もりの目安: `稼働時間 = 満充電から不能になるまでの時間`。  
 手動と自動で周期がずれても、`回数 × 30秒` から換算できます。
 
+### batt_1hz_xiao（約1Hz 数字行ログ / iPad）
+
+LiPo の nRF が BLE キーボードとして動き続ける時間を、**メモに増える行数**で測ります。接続先は触らない **iPad** を想定（自動ロック「しない」＋充電推奨）。
+
+```text
+XIAO nRF D0..D10  ←→  XIAO RP2040 D0..D10
+XIAO nRF GND      ←→  XIAO RP2040 GND
+（3V3 / 5V / BAT は繋がない）
+```
+
+| ピン | キー |
+| --- | --- |
+| D0–D9 | `0`–`9` |
+| D10 | Enter |
+
+- nRF: shield `batt_1hz_xiao`（スリープなし）／ BLE 名 `Batt1Hz Xiao`
+- RP2040: [`tester-digits-rp2040`](tester-digits-rp2040/tester-digits-rp2040.ino) が約1秒ごとに D0→…→D10 を GND へパルス
+- メモ上の1行 `0123456789` ≒ **11秒**（完成行数 × 11 ≒ 稼働秒）
+- iPad が寝ると行が増えないので、試験中はスリープさせない
+
+UF2:
+
+- ZMK: `batt_1hz_xiao-xiao_ble__zmk-zmk.uf2`
+- RP2040: Actions [`Build RP2040 digits tester`](.github/workflows/build-rp2040-digits.yml) → `xiao-rp2040-digits-tester.uf2`
+
 ## RP2040 キーテスター（Arduino）
 
 電池試験用に、XIAO RP2040 が 30 秒周期で `D0` を **500ms** LOW にするファームです（nRF のスリープ復帰＋デバウンス用。短すぎると手動短絡は成功しても自動は失敗しやすい）。未使用の `D1`–`D10` は Hi-Z のままです。パルス時は赤 LED が点灯します。
@@ -243,6 +269,8 @@ include:
   - board: xiao_ble//zmk
     shield: powerbtn_xiao
   - board: xiao_ble//zmk
+    shield: batt_1hz_xiao
+  - board: xiao_ble//zmk
     shield: settings_reset
 ```
 
@@ -257,6 +285,7 @@ include:
 - `rkjxt_xiao-xiao_ble__zmk-zmk.uf2`
 - `batt_test_xiao-xiao_ble__zmk-zmk.uf2`
 - `powerbtn_xiao-xiao_ble__zmk-zmk.uf2`
+- `batt_1hz_xiao-xiao_ble__zmk-zmk.uf2`
 - `settings_reset-xiao_ble__zmk-zmk.uf2`（BLE ペアリング復旧用）
 
 ### UF2 書き込み
@@ -287,12 +316,15 @@ OS の Bluetooth 設定で上記 BLE 名を選択。`BT_CLR` 等は未割り当�
 ├── .github/workflows/
 │   ├── build.yml                 # ZMK
 │   ├── build-rp2040.yml          # XIAO RP2040 key tester
+│   ├── build-rp2040-digits.yml   # XIAO RP2040 digit-line tester
 │   └── build-batt-monitor.yml    # XIAO nRF52840 battery monitor
 ├── .gitignore
 ├── build.yaml
 ├── README.md
 ├── batt_monitor_xiao/
 │   └── batt_monitor_xiao.ino
+├── tester-digits-rp2040/
+│   └── tester-digits-rp2040.ino
 ├── mac-batt-logger/
 │   ├── logger.py
 │   └── requirements.txt
@@ -307,6 +339,7 @@ OS の Bluetooth 設定で上記 BLE 名を選択。`BT_CLR` 等は未割り当�
 │   ├── key_encoder_xiao.conf / .keymap
 │   ├── rkjxt_xiao.conf / .keymap
 │   ├── batt_test_xiao.conf / .keymap
+│   ├── batt_1hz_xiao.conf / .keymap
 │   └── powerbtn_xiao.conf / .keymap
 ├── boards/shields/
 │   ├── onekey_xiao/
@@ -317,6 +350,7 @@ OS の Bluetooth 設定で上記 BLE 名を選択。`BT_CLR` 等は未割り当�
 │   ├── key_encoder_xiao/
 │   ├── rkjxt_xiao/
 │   ├── batt_test_xiao/
+│   ├── batt_1hz_xiao/
 │   └── powerbtn_xiao/
 ├── pcb/
 │   ├── one-key.kicad_pcb
