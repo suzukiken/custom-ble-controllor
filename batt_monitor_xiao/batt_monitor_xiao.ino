@@ -10,13 +10,13 @@
  * After reflash on macOS: toggle Bluetooth off/on (or Forget BattMon) so GATT
  * cache refreshes — otherwise the Mac may still show only the old NUS table.
  *
- * LEDs: boot R→G→B; blue=adv; green=connected; red=sample.
+ * LEDs: boot R→G→B self-test only; red flash on each sample. No heartbeat LEDs.
  */
 
 #include <Adafruit_TinyUSB.h>
 #include <bluefruit.h>
 
-constexpr uint32_t INTERVAL_MS = 30UL * 1000UL;
+constexpr uint32_t INTERVAL_MS = 5UL * 60UL * 1000UL; // 5 minutes
 constexpr char DEVICE_NAME[] = "BattMon Xiao";
 
 #ifndef PIN_VBAT
@@ -183,26 +183,10 @@ void loop() {
   const uint32_t now = millis();
 
   if (Bluefruit.connected()) {
-    static uint32_t last_hb = 0;
-    if (now - last_hb >= 1000) {
-      last_hb = now;
-      digitalWrite(LED_GREEN, LOW);
-      delay(25);
-      digitalWrite(LED_GREEN, HIGH);
-    }
-
     if (g_last_send_ms == 0 || (now - g_last_send_ms) >= INTERVAL_MS) {
       publishSample();
     }
-  } else {
-    static uint32_t last_adv = 0;
-    if (now - last_adv >= 2000) {
-      last_adv = now;
-      digitalWrite(LED_BLUE, LOW);
-      delay(30);
-      digitalWrite(LED_BLUE, HIGH);
-    }
   }
 
-  delay(20);
+  delay(50);
 }
