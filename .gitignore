@@ -1,7 +1,6 @@
 /build/
 /tester-rp2040/build/
 /batt_monitor_xiao/build/
-/powerbtn_xiao/build/
 /mac-batt-logger/.venv/
 /mac-batt-logger/**/*.tsv
 __pycache__/

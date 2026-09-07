@@ -16,4 +16,6 @@ include:
   - board: xiao_ble//zmk
     shield: batt_test_xiao
   - board: xiao_ble//zmk
+    shield: powerbtn_xiao
+  - board: xiao_ble//zmk
     shield: settings_reset

@@ -16,13 +16,14 @@ Board は `xiao_ble//zmk`。ZMK 本体は [`config/west.yml`](config/west.yml) �
 | `key_encoder_xiao` | Xiao + keyswitch + encoder 一体 | D0=SW / D1=A, D2=B, GND | `SPACE` + 方向キー上下 |
 | `rkjxt_xiao` | Xiao + RKJXT1F42001 一体 | 下表 | 十字・Enter・音量 |
 | `batt_test_xiao` | 電池寿命実験用（D0 キーのみ） | D0 ↔ GND | 30秒おきページめくり想定 |
+| `powerbtn_xiao` | 電源ボタン（ZMK Soft Off） | D0 ↔ GND | 3秒長押しで System OFF / 押して起動 |
 
-BLE 名はそれぞれ `OneKey Xiao` / `Key Xiao` / `Encoder Xiao` / `PushEnc Xiao` / `Fourway Xiao` / `KeyEnc Xiao` / `Rkjxt Xiao` / `BattTest Xiao` です（ZMK の上限は15文字）。
+BLE 名はそれぞれ `OneKey Xiao` / `Key Xiao` / `Encoder Xiao` / `PushEnc Xiao` / `Fourway Xiao` / `KeyEnc Xiao` / `Rkjxt Xiao` / `BattTest Xiao` / `PowerBtn Xiao` です（ZMK の上限は15文字）。
 
 共通設定（各 `config/*.conf`）:
 
 - `CONFIG_ZMK_BLE=y` / `CONFIG_ZMK_USB=n`
-- `CONFIG_ZMK_SLEEP=y` / `CONFIG_ZMK_IDLE_SLEEP_TIMEOUT=60000`（60秒）
+- `CONFIG_ZMK_SLEEP=y` / `CONFIG_ZMK_IDLE_SLEEP_TIMEOUT=60000`（60秒）。`powerbtn_xiao` だけ `CONFIG_ZMK_SLEEP=n`（明示オフまで ON のまま）
 - エンコーダ付きは `CONFIG_EC11=y`
 
 ## 配線
@@ -102,6 +103,14 @@ XIAO GND --- GND
 keymap の並びは A, B, C, D, Push。回転は音量 Up/Down（`steps = 20`）。
 
 RKJXT1F42001 は方向入力時に Push も同時に落ちるため、`rkjxt_xiao` では Push を `&none` にしています（Enter が乗らないようにするため）。中央プッシュが必要なら別途相談してください。
+
+### powerbtn_xiao
+
+```text
+XIAO D0 ----[ switch ]---- XIAO GND
+```
+
+`zmk,kscan-gpio-direct`。短押しではキーは出ず、3秒長押しで Soft Off（後述）。
 
 ### batt_test_xiao（電池持ち実験）
 
@@ -192,23 +201,22 @@ Terminal / iTerm に **Bluetooth 権限**が必要です（システム設定 �
 
 ファーム書き込み後、起動時に赤→緑→青のセルフテストがあり、送信時だけ赤 LED が点灯します。Reflash 後に GATT が古い場合は Bluetooth を一度オフ／オンしてください。
 
-## 電源ボタン（System OFF）
+## 電源ボタン（Soft Off）
 
-D0–GND のスイッチで nRF52840 の **System OFF** を入切する Arduino ファームです。
+D0–GND のスイッチで nRF52840 の **System OFF**（ZMK Soft Off）を入切します。短押しではキーは出ません。
 
 | 操作 | 動作 |
 | --- | --- |
-| System OFF 中に押して **1秒長押し** | ON（途中で離すと再び System OFF） |
-| ON 中に **3秒長押し** → 離す | System OFF |
+| Soft Off 中に押す | ON（即起動） |
+| ON 中に **3秒長押し** → 離す | Soft Off |
 
 ```text
 XIAO D0 ----[ switch ]---- XIAO GND
 ```
 
-- ファーム: [`powerbtn_xiao/`](powerbtn_xiao/powerbtn_xiao.ino)
-- Actions [`Build power button`](.github/workflows/build-powerbtn.yml) → `xiao-nrf52840-powerbtn.uf2`
-- USB 接続中は 1秒 ON 確認を省略（書き込み・デバッグ用）
-- LED: ON 確認中は青点滅、OFF 長押し中は赤点滅（待機中は消灯）
+- Shield: `powerbtn_xiao`（他 shield と同じ ZMK ビルド）
+- アイドルスリープなし（OFF するまで ON のまま）
+- LED 演出や「1秒長押しで ON 確定」はなし
 
 ## ビルド
 
@@ -233,6 +241,8 @@ include:
   - board: xiao_ble//zmk
     shield: batt_test_xiao
   - board: xiao_ble//zmk
+    shield: powerbtn_xiao
+  - board: xiao_ble//zmk
     shield: settings_reset
 ```
 
@@ -246,6 +256,7 @@ include:
 - `key_encoder_xiao-xiao_ble__zmk-zmk.uf2`
 - `rkjxt_xiao-xiao_ble__zmk-zmk.uf2`
 - `batt_test_xiao-xiao_ble__zmk-zmk.uf2`
+- `powerbtn_xiao-xiao_ble__zmk-zmk.uf2`
 - `settings_reset-xiao_ble__zmk-zmk.uf2`（BLE ペアリング復旧用）
 
 ### UF2 書き込み
@@ -276,15 +287,12 @@ OS の Bluetooth 設定で上記 BLE 名を選択。`BT_CLR` 等は未割り当�
 ├── .github/workflows/
 │   ├── build.yml                 # ZMK
 │   ├── build-rp2040.yml          # XIAO RP2040 key tester
-│   ├── build-batt-monitor.yml    # XIAO nRF52840 battery monitor
-│   └── build-powerbtn.yml        # XIAO nRF52840 System OFF power button
+│   └── build-batt-monitor.yml    # XIAO nRF52840 battery monitor
 ├── .gitignore
 ├── build.yaml
 ├── README.md
 ├── batt_monitor_xiao/
 │   └── batt_monitor_xiao.ino
-├── powerbtn_xiao/
-│   └── powerbtn_xiao.ino
 ├── mac-batt-logger/
 │   ├── logger.py
 │   └── requirements.txt
@@ -298,7 +306,8 @@ OS の Bluetooth 設定で上記 BLE 名を選択。`BT_CLR` 等は未割り当�
 │   ├── push_encoder_xiao.conf / .keymap
 │   ├── key_encoder_xiao.conf / .keymap
 │   ├── rkjxt_xiao.conf / .keymap
-│   └── batt_test_xiao.conf / .keymap
+│   ├── batt_test_xiao.conf / .keymap
+│   └── powerbtn_xiao.conf / .keymap
 ├── boards/shields/
 │   ├── onekey_xiao/
 │   ├── key_xiao/
@@ -307,7 +316,8 @@ OS の Bluetooth 設定で上記 BLE 名を選択。`BT_CLR` 等は未割り当�
 │   ├── fourway_xiao/
 │   ├── key_encoder_xiao/
 │   ├── rkjxt_xiao/
-│   └── batt_test_xiao/
+│   ├── batt_test_xiao/
+│   └── powerbtn_xiao/
 ├── pcb/
 │   ├── one-key.kicad_pcb
 │   ├── main-board.kicad_pcb
