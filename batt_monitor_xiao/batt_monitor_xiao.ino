@@ -1,20 +1,19 @@
 /*
  * XIAO nRF52840 battery telemetry (no sleep).
  *
- * Every INTERVAL_MS after connect (and when Mac writes any NUS RX byte),
- * send via Nordic UART Service:
+ * While connected: send every INTERVAL_MS via Nordic UART:
  *   uptime_s=<sec> percent=<0-100> voltage_mv=<mv>\n
+ * Host write to NUS RX also requests an immediate sample (flag only in callback).
  *
- * IMPORTANT: never delay()/ADC inside Bluefruit callbacks — SoftDevice hangs.
+ * LEDs (active low): blue=advertising, green=connected heartbeat, red=send.
  *
- * Board: Seeed nRF52 Boards → "Seeed XIAO nRF52840". Flash as UF2.
+ * Board: Seeed nRF52 Boards → Seeed XIAO nRF52840. Flash as UF2.
  */
 
 #include <Adafruit_TinyUSB.h>
 #include <bluefruit.h>
 
-constexpr uint32_t INTERVAL_MS = 30UL * 1000UL; // 30s bring-up; later → 10 min
-constexpr uint32_t FIRST_SEND_DELAY_MS = 1500UL;
+constexpr uint32_t INTERVAL_MS = 30UL * 1000UL;
 constexpr char DEVICE_NAME[] = "BattMon Xiao";
 
 #ifndef PIN_VBAT
@@ -27,24 +26,19 @@ constexpr char DEVICE_NAME[] = "BattMon Xiao";
 BLEUart bleuart;
 
 static uint32_t g_boot_ms = 0;
-static uint32_t g_conn_ms = 0;
 static uint32_t g_last_send_ms = 0;
 static volatile bool g_connected = false;
 static volatile bool g_poll_requested = false;
-static bool g_sent_this_conn = false;
 
 static float readBatteryVolts() {
   digitalWrite(PIN_VBAT_ENABLE, LOW);
   delay(2);
-
   uint32_t sum = 0;
-  constexpr int SAMPLES = 4;
-  for (int i = 0; i < SAMPLES; i++) {
+  for (int i = 0; i < 4; i++) {
     sum += analogRead(PIN_VBAT);
     delay(1);
   }
-  const float adc = sum / float(SAMPLES);
-  return 2.961f * 3.6f * adc / 4096.0f;
+  return 2.961f * 3.6f * (sum / 4.0f) / 4096.0f;
 }
 
 static uint8_t percentFromMv(uint16_t mv) {
@@ -62,29 +56,28 @@ static uint8_t percentFromMv(uint16_t mv) {
   const size_t n = sizeof(kTable) / sizeof(kTable[0]);
   for (size_t i = 1; i < n; i++) {
     if (mv >= kTable[i].mv) {
-      const uint16_t mv_hi = kTable[i - 1].mv;
-      const uint16_t mv_lo = kTable[i].mv;
-      const uint8_t pct_hi = kTable[i - 1].pct;
-      const uint8_t pct_lo = kTable[i].pct;
-      const uint32_t span = mv_hi - mv_lo;
-      if (span == 0) {
-        return pct_lo;
+      const uint16_t hi = kTable[i - 1].mv;
+      const uint16_t lo = kTable[i].mv;
+      const uint8_t phi = kTable[i - 1].pct;
+      const uint8_t plo = kTable[i].pct;
+      if (hi == lo) {
+        return plo;
       }
-      return pct_lo +
-             (uint8_t)(((uint32_t)(mv - mv_lo) * (pct_hi - pct_lo)) / span);
+      return plo + (uint8_t)(((uint32_t)(mv - lo) * (phi - plo)) / (hi - lo));
     }
   }
   return 0;
 }
 
 static void sendTelemetry() {
-  // Flash first so we can see attempts even if ADC/BLE write misbehaves.
+  // Red ON for the whole send attempt (visible even if we hang in ADC).
   digitalWrite(LED_RED, LOW);
 
   const uint32_t uptime_s = (millis() - g_boot_ms) / 1000UL;
-  const float volts = readBatteryVolts();
+  float volts = 0.0f;
+  volts = readBatteryVolts();
   uint16_t mv = 0;
-  if (volts > 0.0f && volts < 6.0f) {
+  if (volts > 0.5f && volts < 5.5f) {
     mv = (uint16_t)(volts * 1000.0f + 0.5f);
   }
   const uint8_t pct = percentFromMv(mv);
@@ -94,18 +87,17 @@ static void sendTelemetry() {
            "uptime_s=%lu percent=%u voltage_mv=%u\n",
            (unsigned long)uptime_s, (unsigned)pct, (unsigned)mv);
 
+  // Flush notify several ways — some hosts need notifyEnabled.
   if (Bluefruit.connected()) {
     bleuart.print(line);
+    bleuart.flush();
   }
 
-  delay(60);
+  delay(100);
   digitalWrite(LED_RED, HIGH);
-
   g_last_send_ms = millis();
-  g_sent_this_conn = true;
 }
 
-// Callbacks: flags only — no delay/ADC/print here.
 static void bleuart_rx_callback(uint16_t conn_hdl) {
   (void)conn_hdl;
   while (bleuart.available()) {
@@ -117,9 +109,8 @@ static void bleuart_rx_callback(uint16_t conn_hdl) {
 static void connect_callback(uint16_t conn_hdl) {
   (void)conn_hdl;
   g_connected = true;
-  g_conn_ms = millis();
-  g_sent_this_conn = false;
-  g_poll_requested = false;
+  g_poll_requested = true; // send ASAP from loop after connect
+  g_last_send_ms = 0;
 }
 
 static void disconnect_callback(uint16_t conn_hdl, uint8_t reason) {
@@ -127,27 +118,37 @@ static void disconnect_callback(uint16_t conn_hdl, uint8_t reason) {
   (void)reason;
   g_connected = false;
   g_poll_requested = false;
-  g_sent_this_conn = false;
   Bluefruit.Advertising.start(0);
 }
 
 void setup() {
   pinMode(LED_RED, OUTPUT);
-  digitalWrite(LED_RED, HIGH);
   pinMode(LED_GREEN, OUTPUT);
-  digitalWrite(LED_GREEN, HIGH);
   pinMode(LED_BLUE, OUTPUT);
+  digitalWrite(LED_RED, HIGH);
+  digitalWrite(LED_GREEN, HIGH);
+  digitalWrite(LED_BLUE, HIGH);
+
+  // Boot LED self-test: R → G → B (confirms which UF2 is running).
+  digitalWrite(LED_RED, LOW);
+  delay(200);
+  digitalWrite(LED_RED, HIGH);
+  digitalWrite(LED_GREEN, LOW);
+  delay(200);
+  digitalWrite(LED_GREEN, HIGH);
+  digitalWrite(LED_BLUE, LOW);
+  delay(200);
   digitalWrite(LED_BLUE, HIGH);
 
   pinMode(PIN_VBAT_ENABLE, OUTPUT);
   digitalWrite(PIN_VBAT_ENABLE, LOW);
   pinMode(PIN_VBAT, INPUT);
-
   analogReference(AR_DEFAULT);
   analogReadResolution(12);
 
   g_boot_ms = millis();
 
+  Bluefruit.autoConnLed(false);
   Bluefruit.begin();
   Bluefruit.setTxPower(4);
   Bluefruit.setName(DEVICE_NAME);
@@ -170,31 +171,30 @@ void setup() {
 void loop() {
   const uint32_t now = millis();
 
-  if (g_connected && Bluefruit.connected()) {
-    // Green heartbeat while connected (proves loop is alive).
+  // Prefer SoftDevice connection state; keep flag in sync.
+  const bool connected = Bluefruit.connected();
+  if (!connected) {
+    g_connected = false;
+  }
+
+  if (connected) {
     static uint32_t last_hb = 0;
     if (now - last_hb >= 1000) {
       last_hb = now;
       digitalWrite(LED_GREEN, LOW);
-      delay(20);
+      delay(25);
       digitalWrite(LED_GREEN, HIGH);
     }
 
-    bool due = false;
-    if (g_poll_requested) {
+    // Send: on poll/connect request, or every INTERVAL_MS.
+    // g_last_send_ms==0 means "never sent this boot/connection".
+    const bool interval_due =
+        (g_last_send_ms == 0) || ((now - g_last_send_ms) >= INTERVAL_MS);
+    if (g_poll_requested || interval_due) {
       g_poll_requested = false;
-      due = true;
-    } else if (!g_sent_this_conn && (now - g_conn_ms >= FIRST_SEND_DELAY_MS)) {
-      due = true;
-    } else if (g_sent_this_conn && (now - g_last_send_ms >= INTERVAL_MS)) {
-      due = true;
-    }
-
-    if (due) {
       sendTelemetry();
     }
   } else {
-    g_connected = false;
     static uint32_t last_adv = 0;
     if (now - last_adv >= 2000) {
       last_adv = now;
