@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """
-Receive BattMon Xiao Nordic UART telemetry and keep a local text log updated.
+Receive BattMon Xiao telemetry and append to a TSV log.
 
-Firmware line format:
-  uptime_s=<sec> percent=<0-100> voltage_mv=<mv>\\n
+Prefers custom GATT (read+notify). Falls back to Nordic UART notify when
+macOS is still serving a cached NUS-only GATT table after a reflash.
 
-Log file (TSV, appended each sample; also rewritten as *-latest.tsv):
-  host_iso\\tuptime_s\\tpercent\\tvoltage_mv
+Custom:
+  7f5f0001-… / 7f5f0002-…  (read + notify)
+NUS:
+  6e400003-…  (notify), 6e400002-… (write poll)
 """
 
 from __future__ import annotations
@@ -24,15 +26,16 @@ from bleak.backends.characteristic import BleakGATTCharacteristic
 from bleak.backends.device import BLEDevice
 from bleak.backends.scanner import AdvertisementData
 
-# Nordic UART Service (Adafruit BLEUart)
-NUS_SERVICE = UUID("6e400001-b5a3-f393-e0a9-e50e24dcca9e")
-NUS_RX_CHAR = "6e400002-b5a3-f393-e0a9-e50e24dcca9e"  # write (host → device)
-NUS_TX_CHAR = "6e400003-b5a3-f393-e0a9-e50e24dcca9e"  # notify (device → host)
+CUSTOM_SERVICE = UUID("7f5f0001-7a4b-4c8f-9e2d-1b3c5a7e9f01")
+CUSTOM_CHAR = "7f5f0002-7a4b-4c8f-9e2d-1b3c5a7e9f01"
+NUS_TX = "6e400003-b5a3-f393-e0a9-e50e24dcca9e"
+NUS_RX = "6e400002-b5a3-f393-e0a9-e50e24dcca9e"
 DEFAULT_NAME = "BattMon Xiao"
 LINE_RE = re.compile(
     r"uptime_s=(\d+)\s+percent=(\d+)\s+voltage_mv=(\d+)",
     re.IGNORECASE,
 )
+READ_EVERY_S = 5.0
 
 
 def host_iso() -> str:
@@ -67,8 +70,15 @@ class FileSink:
             self.path.write_text(
                 "host_iso\tuptime_s\tpercent\tvoltage_mv\n", encoding="utf-8"
             )
+        self._last_key: tuple[int, int, int] | None = None
 
-    def write_sample(self, uptime_s: int, percent: int, voltage_mv: int) -> None:
+    def write_sample(
+        self, uptime_s: int, percent: int, voltage_mv: int, *, source: str
+    ) -> None:
+        key = (uptime_s, percent, voltage_mv)
+        if key == self._last_key:
+            return
+        self._last_key = key
         row = f"{host_iso()}\t{uptime_s}\t{percent}\t{voltage_mv}\n"
         with self.path.open("a", encoding="utf-8") as f:
             f.write(row)
@@ -77,157 +87,166 @@ class FileSink:
             "host_iso\tuptime_s\tpercent\tvoltage_mv\n" + row,
             encoding="utf-8",
         )
-        print(row.rstrip(), flush=True)
+        print(f"{row.rstrip()}  # {source}", flush=True)
+
+
+def handle_payload(sink: FileSink, raw: bytes | bytearray, source: str) -> None:
+    text = raw.decode("utf-8", errors="replace")
+    for part in text.replace("\r", "\n").split("\n"):
+        line = part.strip()
+        if not line:
+            continue
+        parsed = parse_line(line)
+        if parsed is None:
+            print(f"# unparsed ({source}): {line!r}", flush=True)
+            continue
+        sink.write_sample(*parsed, source=source)
 
 
 async def find_device(
-    name: str,
-    timeout: float,
-    address: str | None = None,
+    name: str, timeout: float, address: str | None
 ) -> BLEDevice:
     target = name.casefold()
     short = "battmon"
-    nus = str(NUS_SERVICE).lower()
+    custom = str(CUSTOM_SERVICE).lower()
 
     if address:
-        print(f"Looking up address {address}…", flush=True)
         device = await BleakScanner.find_device_by_address(address, timeout=timeout)
         if device is None:
             raise RuntimeError(f"No device at address {address!r}")
         print(f"Found {device.name or '(no name)'}  address={device.address}", flush=True)
         return device
 
-    print(
-        f"Scanning for name {name!r} or NUS UUID (timeout {timeout:.0f}s)…",
-        flush=True,
-    )
+    print(f"Scanning for {name!r} (timeout {timeout:.0f}s)…", flush=True)
     seen: dict[str, tuple[str, str]] = {}
 
     def match(device: BLEDevice, adv: AdvertisementData) -> bool:
         label = device_label(device, adv)
         uuids = {_norm_uuid(u) for u in (adv.service_uuids or [])}
         seen[device.address] = (label or "(no name)", ",".join(sorted(uuids)) or "-")
-        label_cf = label.casefold()
-        # Prefer real BattMon name. macOS often caches an old name (e.g. OneKey)
-        # for a re-flashed board — then NUS UUID is the reliable signal.
-        if label_cf == target or short in label_cf:
+        if label.casefold() == target or short in label.casefold():
             return True
-        return nus in uuids
+        return custom in uuids
 
     device = await BleakScanner.find_device_by_filter(match, timeout=timeout)
     if device is None:
         if seen:
-            print("# devices seen during scan:", flush=True)
+            print("# devices seen:", flush=True)
             for addr, (label, uuids) in sorted(seen.items()):
                 print(f"#   {addr}  name={label!r}  uuids={uuids}", flush=True)
-        raise RuntimeError(
-            f"Device {name!r} not found.\n"
-            "Check: UF2 flashed, board powered, blue LED blinking while idle, "
-            "macOS Bluetooth on, and Terminal has Bluetooth permission "
-            "(System Settings → Privacy & Security → Bluetooth).\n"
-            "Retry with --address <uuid> from the scan dump above."
-        )
-    shown = device.name or "(no name)"
-    print(f"Found {shown}  address={device.address}", flush=True)
-    if "battmon" not in shown.casefold():
-        print(
-            "# note: displayed name is not BattMon — macOS may be caching an old "
-            "name for this board. Continuing because NUS/BattMon match succeeded.",
-            flush=True,
-        )
+        raise RuntimeError(f"Device {name!r} not found")
+    print(f"Found {device.name or '(no name)'}  address={device.address}", flush=True)
     return device
 
 
+def char_uuids(client: BleakClient) -> set[str]:
+    out: set[str] = set()
+    for svc in client.services:
+        for char in svc.characteristics:
+            out.add(str(char.uuid).lower())
+    return out
+
+
 async def run(
-    name: str,
-    out: Path,
-    scan_timeout: float,
-    address: str | None,
+    name: str, out: Path, scan_timeout: float, address: str | None
 ) -> None:
     sink = FileSink(out)
-    buffer = ""
 
     while True:
         device = await find_device(name, scan_timeout, address)
 
         def on_notify(_: BleakGATTCharacteristic, data: bytearray) -> None:
-            nonlocal buffer
-            buffer += data.decode("utf-8", errors="replace")
-            while "\n" in buffer:
-                line, buffer = buffer.split("\n", 1)
-                line = line.strip()
-                if not line:
-                    continue
-                parsed = parse_line(line)
-                if parsed is None:
-                    print(f"# unparsed: {line!r}", flush=True)
-                    continue
-                sink.write_sample(*parsed)
+            handle_payload(sink, data, "notify")
 
         print(f"Connecting… log → {out}", flush=True)
         try:
             async with BleakClient(device, timeout=30.0) as client:
                 if not client.is_connected:
                     raise RuntimeError("connect failed")
-                print("Connected. Enabling notifications…", flush=True)
-                await client.start_notify(NUS_TX_CHAR, on_notify)
-                # Ask firmware to send immediately (any RX byte triggers a sample).
-                await asyncio.sleep(0.3)
-                try:
-                    await client.write_gatt_char(NUS_RX_CHAR, b"poll\n", response=False)
-                    print("Polled device for a sample.", flush=True)
-                except Exception as write_exc:  # noqa: BLE001
-                    print(f"# poll write failed: {write_exc!r}", flush=True)
-                waited = 0
-                while client.is_connected:
-                    await asyncio.sleep(1.0)
-                    waited += 1
-                    if waited % 15 == 0:
+
+                print("# GATT:", flush=True)
+                for svc in client.services:
+                    print(f"#  service {svc.uuid}", flush=True)
+                    for char in svc.characteristics:
                         print(
-                            f"# still waiting for notify… ({waited}s). "
-                            "If red LED never flashes, reflash the latest UF2.",
+                            f"#    char {char.uuid} props={char.properties}",
                             flush=True,
                         )
+
+                uuids = char_uuids(client)
+                has_custom = CUSTOM_CHAR.lower() in uuids
+                has_nus = NUS_TX.lower() in uuids
+
+                if not has_custom and has_nus:
+                    print(
+                        "# warning: only Nordic UART is visible — macOS may be "
+                        "caching old GATT. Toggle Bluetooth OFF/ON (or Forget "
+                        "BattMon), reflash, then reconnect. Meanwhile using NUS.",
+                        flush=True,
+                    )
+
+                if has_custom:
+                    try:
+                        await client.start_notify(CUSTOM_CHAR, on_notify)
+                        print("Notify on custom char enabled.", flush=True)
+                    except Exception as exc:  # noqa: BLE001
+                        print(f"# custom notify failed: {exc!r}", flush=True)
+                    try:
+                        raw = await client.read_gatt_char(CUSTOM_CHAR)
+                        print(f"# first read {raw!r}", flush=True)
+                        handle_payload(sink, raw, "read")
+                    except Exception as exc:  # noqa: BLE001
+                        print(f"# custom read failed: {exc!r}", flush=True)
+
+                if has_nus:
+                    try:
+                        await client.start_notify(NUS_TX, on_notify)
+                        print("Notify on NUS TX enabled.", flush=True)
+                    except Exception as exc:  # noqa: BLE001
+                        print(f"# NUS notify failed: {exc!r}", flush=True)
+                    try:
+                        await client.write_gatt_char(NUS_RX, b"poll\n", response=False)
+                        print("NUS poll written.", flush=True)
+                    except Exception as exc:  # noqa: BLE001
+                        print(f"# NUS poll failed: {exc!r}", flush=True)
+
+                if not has_custom and not has_nus:
+                    raise RuntimeError("No known telemetry characteristics")
+
+                elapsed = 0.0
+                while client.is_connected:
+                    await asyncio.sleep(READ_EVERY_S)
+                    elapsed += READ_EVERY_S
+                    if has_custom:
+                        try:
+                            raw = await client.read_gatt_char(CUSTOM_CHAR)
+                            handle_payload(sink, raw, "read")
+                        except Exception as exc:  # noqa: BLE001
+                            print(f"# read failed: {exc!r}", flush=True)
+                            break
+                    elif has_nus:
                         try:
                             await client.write_gatt_char(
-                                NUS_RX_CHAR, b"poll\n", response=False
+                                NUS_RX, b"poll\n", response=False
                             )
-                        except Exception:
-                            pass
+                        except Exception as exc:  # noqa: BLE001
+                            print(f"# NUS poll failed: {exc!r}", flush=True)
+                            break
+                    if int(elapsed) % 30 == 0:
+                        print(f"# still connected… {int(elapsed)}s", flush=True)
         except asyncio.CancelledError:
             raise
-        except Exception as exc:  # noqa: BLE001 — keep logger alive
+        except Exception as exc:  # noqa: BLE001
             print(f"# disconnect/error: {exc!r}; retry in 5s", flush=True)
             await asyncio.sleep(5.0)
 
 
 def main() -> int:
     p = argparse.ArgumentParser(description="BattMon Xiao BLE logger for macOS")
-    p.add_argument(
-        "-o",
-        "--output",
-        type=Path,
-        default=Path("batt-monitor-log.tsv"),
-        help="TSV log path (default: ./batt-monitor-log.tsv)",
-    )
-    p.add_argument(
-        "-n",
-        "--name",
-        default=DEFAULT_NAME,
-        help=f"BLE advertised name (default: {DEFAULT_NAME})",
-    )
-    p.add_argument(
-        "-a",
-        "--address",
-        default=None,
-        help="Connect by CoreBluetooth UUID / address (skip name match)",
-    )
-    p.add_argument(
-        "--scan-timeout",
-        type=float,
-        default=30.0,
-        help="Seconds to scan before giving up on one attempt",
-    )
+    p.add_argument("-o", "--output", type=Path, default=Path("batt-monitor-log.tsv"))
+    p.add_argument("-n", "--name", default=DEFAULT_NAME)
+    p.add_argument("-a", "--address", default=None)
+    p.add_argument("--scan-timeout", type=float, default=30.0)
     args = p.parse_args()
     try:
         asyncio.run(run(args.name, args.output, args.scan_timeout, args.address))

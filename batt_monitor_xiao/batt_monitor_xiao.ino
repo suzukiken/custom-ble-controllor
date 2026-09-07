@@ -1,13 +1,16 @@
 /*
  * XIAO nRF52840 battery telemetry (no sleep).
  *
- * While connected: send every INTERVAL_MS via Nordic UART:
- *   uptime_s=<sec> percent=<0-100> voltage_mv=<mv>\n
- * Host write to NUS RX also requests an immediate sample (flag only in callback).
+ * Exposes TWO ways to read the same line (macOS often caches GATT after reflash):
+ *  1) Custom char (read+notify): 7f5f0002-7a4b-4c8f-9e2d-1b3c5a7e9f01
+ *  2) Nordic UART TX notify:     6e400003-b5a3-f393-e0a9-e50e24dcca9e
  *
- * LEDs (active low): blue=advertising, green=connected heartbeat, red=send.
+ * Payload: uptime_s=<sec> percent=<0-100> voltage_mv=<mv>\n
  *
- * Board: Seeed nRF52 Boards → Seeed XIAO nRF52840. Flash as UF2.
+ * After reflash on macOS: toggle Bluetooth off/on (or Forget BattMon) so GATT
+ * cache refreshes — otherwise the Mac may still show only the old NUS table.
+ *
+ * LEDs: boot R→G→B; blue=adv; green=connected; red=sample.
  */
 
 #include <Adafruit_TinyUSB.h>
@@ -23,12 +26,13 @@ constexpr char DEVICE_NAME[] = "BattMon Xiao";
 #define PIN_VBAT_ENABLE VBAT_ENABLE
 #endif
 
+BLEService battService("7f5f0001-7a4b-4c8f-9e2d-1b3c5a7e9f01");
+BLECharacteristic battChar("7f5f0002-7a4b-4c8f-9e2d-1b3c5a7e9f01");
 BLEUart bleuart;
 
 static uint32_t g_boot_ms = 0;
 static uint32_t g_last_send_ms = 0;
-static volatile bool g_connected = false;
-static volatile bool g_poll_requested = false;
+static char g_last_line[96] = "uptime_s=0 percent=0 voltage_mv=0\n";
 
 static float readBatteryVolts() {
   digitalWrite(PIN_VBAT_ENABLE, LOW);
@@ -69,31 +73,32 @@ static uint8_t percentFromMv(uint16_t mv) {
   return 0;
 }
 
-static void sendTelemetry() {
-  // Red ON for the whole send attempt (visible even if we hang in ADC).
-  digitalWrite(LED_RED, LOW);
-
+static void sampleToBuffer() {
   const uint32_t uptime_s = (millis() - g_boot_ms) / 1000UL;
-  float volts = 0.0f;
-  volts = readBatteryVolts();
+  const float volts = readBatteryVolts();
   uint16_t mv = 0;
   if (volts > 0.5f && volts < 5.5f) {
     mv = (uint16_t)(volts * 1000.0f + 0.5f);
   }
   const uint8_t pct = percentFromMv(mv);
-
-  char line[96];
-  snprintf(line, sizeof(line),
+  snprintf(g_last_line, sizeof(g_last_line),
            "uptime_s=%lu percent=%u voltage_mv=%u\n",
            (unsigned long)uptime_s, (unsigned)pct, (unsigned)mv);
+}
 
-  // Flush notify several ways — some hosts need notifyEnabled.
+static void publishSample() {
+  digitalWrite(LED_RED, LOW);
+
+  sampleToBuffer();
+  const uint16_t len = (uint16_t)strlen(g_last_line);
+
+  battChar.write((const uint8_t *)g_last_line, len);
   if (Bluefruit.connected()) {
-    bleuart.print(line);
-    bleuart.flush();
+    battChar.notify((const uint8_t *)g_last_line, len);
+    bleuart.write((const uint8_t *)g_last_line, len);
   }
 
-  delay(100);
+  delay(80);
   digitalWrite(LED_RED, HIGH);
   g_last_send_ms = millis();
 }
@@ -103,21 +108,17 @@ static void bleuart_rx_callback(uint16_t conn_hdl) {
   while (bleuart.available()) {
     (void)bleuart.read();
   }
-  g_poll_requested = true;
+  g_last_send_ms = 0; // request publish from loop (no heavy work here)
 }
 
 static void connect_callback(uint16_t conn_hdl) {
   (void)conn_hdl;
-  g_connected = true;
-  g_poll_requested = true; // send ASAP from loop after connect
   g_last_send_ms = 0;
 }
 
 static void disconnect_callback(uint16_t conn_hdl, uint8_t reason) {
   (void)conn_hdl;
   (void)reason;
-  g_connected = false;
-  g_poll_requested = false;
   Bluefruit.Advertising.start(0);
 }
 
@@ -129,7 +130,6 @@ void setup() {
   digitalWrite(LED_GREEN, HIGH);
   digitalWrite(LED_BLUE, HIGH);
 
-  // Boot LED self-test: R → G → B (confirms which UF2 is running).
   digitalWrite(LED_RED, LOW);
   delay(200);
   digitalWrite(LED_RED, HIGH);
@@ -147,21 +147,32 @@ void setup() {
   analogReadResolution(12);
 
   g_boot_ms = millis();
+  sampleToBuffer();
 
   Bluefruit.autoConnLed(false);
+  Bluefruit.configPrphBandwidth(BANDWIDTH_MAX);
   Bluefruit.begin();
   Bluefruit.setTxPower(4);
   Bluefruit.setName(DEVICE_NAME);
   Bluefruit.Periph.setConnectCallback(connect_callback);
   Bluefruit.Periph.setDisconnectCallback(disconnect_callback);
 
+  // Custom readable telemetry
+  battService.begin();
+  battChar.setProperties(CHR_PROPS_READ | CHR_PROPS_NOTIFY);
+  battChar.setPermission(SECMODE_OPEN, SECMODE_NO_ACCESS);
+  battChar.setMaxLen(sizeof(g_last_line));
+  battChar.begin();
+  battChar.write((const uint8_t *)g_last_line, strlen(g_last_line));
+
+  // Nordic UART (helps when Mac still has NUS cached from older builds)
   bleuart.begin();
   bleuart.setRxCallback(bleuart_rx_callback);
 
   Bluefruit.Advertising.addFlags(BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE);
   Bluefruit.Advertising.addTxPower();
   Bluefruit.Advertising.addName();
-  Bluefruit.ScanResponse.addService(bleuart);
+  Bluefruit.ScanResponse.addService(battService);
   Bluefruit.Advertising.restartOnDisconnect(true);
   Bluefruit.Advertising.setInterval(32, 244);
   Bluefruit.Advertising.setFastTimeout(30);
@@ -171,13 +182,7 @@ void setup() {
 void loop() {
   const uint32_t now = millis();
 
-  // Prefer SoftDevice connection state; keep flag in sync.
-  const bool connected = Bluefruit.connected();
-  if (!connected) {
-    g_connected = false;
-  }
-
-  if (connected) {
+  if (Bluefruit.connected()) {
     static uint32_t last_hb = 0;
     if (now - last_hb >= 1000) {
       last_hb = now;
@@ -186,13 +191,8 @@ void loop() {
       digitalWrite(LED_GREEN, HIGH);
     }
 
-    // Send: on poll/connect request, or every INTERVAL_MS.
-    // g_last_send_ms==0 means "never sent this boot/connection".
-    const bool interval_due =
-        (g_last_send_ms == 0) || ((now - g_last_send_ms) >= INTERVAL_MS);
-    if (g_poll_requested || interval_due) {
-      g_poll_requested = false;
-      sendTelemetry();
+    if (g_last_send_ms == 0 || (now - g_last_send_ms) >= INTERVAL_MS) {
+      publishSample();
     }
   } else {
     static uint32_t last_adv = 0;

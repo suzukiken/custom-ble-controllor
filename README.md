@@ -154,6 +154,12 @@ ZMK ではなく **Arduino（Seeed nRF52 / Bluefruit）** の専用ファーム�
 uptime_s=600 percent=87 voltage_mv=3921
 ```
 
+GATT（Nordic UART ではなく独自サービス）:
+
+- Service `7f5f0001-7a4b-4c8f-9e2d-1b3c5a7e9f01`
+- Characteristic `7f5f0002-…`（Read + Notify）
+
+Mac ロガーは Notify に加え、数秒ごとの Read でも取ります。
 ### ファーム書き込み
 
 1. Actions [`Build batt monitor`](.github/workflows/build-batt-monitor.yml) の Artifact `batt-monitor-firmware` から `xiao-nrf52840-batt-monitor.uf2` を取得  
@@ -184,7 +190,7 @@ python logger.py -o ~/Desktop/batt-monitor-log.tsv
 OS の「Bluetooth」設定でデバイスをペアリングする必要はありません（ロガーが直接 GATT 接続します）。  
 Terminal / iTerm に **Bluetooth 権限**が必要です（システム設定 → プライバシーとセキュリティ → Bluetooth）。
 
-ファーム書き込み後、未接続時は青 LED が約2秒ごとに点滅します（広告中の心拍）。
+ファーム書き込み後、起動時に赤→緑→青のセルフテスト、未接続時は青 LED 点滅、接続中は緑、送信時は赤です。
 
 ## ビルド
 
