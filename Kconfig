@@ -1,3 +1,24 @@
 # SPDX-License-Identifier: MIT
+# Loaded via zephyr/module.yml (ZMK_EXTRA_MODULES = this repo).
 
-rsource "modules/zmk-soak-status/Kconfig"
+config ZMK_SOAK_STATUS
+	bool "Periodic HID soak status lines (uptime / battery)"
+	depends on ZMK_BATTERY_REPORTING
+	help
+	  Every INTERVAL seconds, type a Notes-friendly status line via HID:
+	  u<uptime_s>p<percent>v<mv> + Enter
+	  Use with batt_1hz_xiao key spam to measure ZMK battery life under load.
+
+if ZMK_SOAK_STATUS
+
+config ZMK_SOAK_STATUS_INTERVAL_SEC
+	int "Seconds between status lines"
+	default 300
+	range 30 86400
+
+config ZMK_SOAK_STATUS_INITIAL_DELAY_SEC
+	int "Seconds before first status line"
+	default 15
+	range 1 600
+
+endif
