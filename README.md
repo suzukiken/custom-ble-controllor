@@ -325,7 +325,7 @@ OS の Bluetooth 設定で上記 BLE 名を選択。`BT_CLR` 等は未割り当�
 ├── tester-digits-rp2040/
 │   └── tester-digits-rp2040.ino
 ├── modules/
-│   └── zmk-soak-status/          # periodic u/p/v HID lines for batt_1hz soak
+│   └── zmk-soak-status/          # soak HID status (built via root Zephyr module)
 ├── mac-batt-logger/
 │   ├── logger.py
 │   └── requirements.txt
