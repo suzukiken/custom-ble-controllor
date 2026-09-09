@@ -154,7 +154,7 @@ nRF = LiPo / RP2040 = USB
 | --- | --- |
 | RP2040 | 約1秒ごとに D0→…→D10 を GND パルス → `0123456789` + Enter |
 | ZMK `batt_1hz_xiao` | スリープなし。打鍵を BLE HID でホストへ |
-| ZMK module `zmk-soak-status` | 約5分ごとにステータス行を HID で打つ: `u<秒>p<% >v<mV>` |
+| ZMK `src/soak_status.c` | 約5分ごとにステータス行を HID で打つ: `u<秒>p<% >v<mV>` |
 
 メモ／Notes の例:
 
@@ -324,8 +324,8 @@ OS の Bluetooth 設定で上記 BLE 名を選択。`BT_CLR` 等は未割り当�
 │   └── batt_monitor_xiao.ino
 ├── tester-digits-rp2040/
 │   └── tester-digits-rp2040.ino
-├── modules/
-│   └── zmk-soak-status/          # soak HID status (built via root Zephyr module)
+├── src/
+│   └── soak_status.c             # batt_1hz periodic u/p/v HID lines
 ├── mac-batt-logger/
 │   ├── logger.py
 │   └── requirements.txt
