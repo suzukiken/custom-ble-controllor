@@ -71,11 +71,13 @@ class FileSink:
                 "host_iso\tuptime_s\tpercent\tvoltage_mv\n", encoding="utf-8"
             )
         self._last_key: tuple[int, int, int] | None = None
+        self.last_sample: tuple[int, int, int] | None = None
 
     def write_sample(
         self, uptime_s: int, percent: int, voltage_mv: int, *, source: str
     ) -> None:
         key = (uptime_s, percent, voltage_mv)
+        self.last_sample = key
         if key == self._last_key:
             return
         self._last_key = key
@@ -234,9 +236,23 @@ async def run(
                             break
                     if int(elapsed) % 30 == 0:
                         print(f"# still connected… {int(elapsed)}s", flush=True)
+                if sink.last_sample is not None:
+                    u, p, v = sink.last_sample
+                    print(
+                        f"# session end — last uptime_s={u} percent={p} "
+                        f"voltage_mv={v} (≈ {u / 3600:.2f} h)",
+                        flush=True,
+                    )
         except asyncio.CancelledError:
             raise
         except Exception as exc:  # noqa: BLE001
+            if sink.last_sample is not None:
+                u, p, v = sink.last_sample
+                print(
+                    f"# last known sample before error: uptime_s={u} "
+                    f"percent={p} voltage_mv={v}",
+                    flush=True,
+                )
             print(f"# disconnect/error: {exc!r}; retry in 5s", flush=True)
             await asyncio.sleep(5.0)
 

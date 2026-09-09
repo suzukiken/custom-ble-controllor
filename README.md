@@ -17,7 +17,9 @@ Board は `xiao_ble//zmk`。ZMK 本体は [`config/west.yml`](config/west.yml) �
 | `rkjxt_xiao` | Xiao + RKJXT1F42001 一体 | 下表 | 十字・Enter・音量 |
 | `batt_test_xiao` | 電池寿命実験用（D0 キーのみ） | D0 ↔ GND | 30秒おきページめくり想定 |
 | `powerbtn_xiao` | 電源ボタン（ZMK Soft Off） | D0 ↔ GND | 3秒長押しで System OFF / 押して起動 |
-| `batt_1hz_xiao` | 電池 soak（RP2040 積み） | D0–D9=0–9 / D10=Enter | 約1秒に1打・行数で稼働時間 |
+| `batt_1hz_xiao` | ZMK 電池 soak（キー負荷） | D0–D9=0–9 / D10=Enter | RP2040 約1Hz打鍵＋数分おきに u/p/v をHID出力 |
+
+BLE 名はそれぞれ `OneKey Xiao` / `Key Xiao` / `Encoder Xiao` / `PushEnc Xiao` / `Fourway Xiao` / `KeyEnc Xiao` / `Rkjxt Xiao` / `BattTest Xiao` / `PowerBtn Xiao` / `Batt1Hz Xiao` です（ZMK の上限は15文字）。
 
 BLE 名はそれぞれ `OneKey Xiao` / `Key Xiao` / `Encoder Xiao` / `PushEnc Xiao` / `Fourway Xiao` / `KeyEnc Xiao` / `Rkjxt Xiao` / `BattTest Xiao` / `PowerBtn Xiao` / `Batt1Hz Xiao` です（ZMK の上限は15文字）。
 
@@ -137,30 +139,38 @@ XIAO D0 ----[ switch or external timer ]---- XIAO GND
 見積もりの目安: `稼働時間 = 満充電から不能になるまでの時間`。  
 手動と自動で周期がずれても、`回数 × 30秒` から換算できます。
 
-### batt_1hz_xiao（約1Hz 数字行ログ / iPad）
+### batt_1hz_xiao（推奨・ZMK＋キー負荷の電池寿命）
 
-LiPo の nRF が BLE キーボードとして動き続ける時間を、**メモに増える行数**で測ります。接続先は触らない **iPad** を想定（自動ロック「しない」＋充電推奨）。
+最終製品が ZMK 前提なので、**キーをガンガン飛ばしたときの持ち**はこちらで測ります。
 
 ```text
 XIAO nRF D0..D10  ←→  XIAO RP2040 D0..D10
 XIAO nRF GND      ←→  XIAO RP2040 GND
 （3V3 / 5V / BAT は繋がない）
+nRF = LiPo / RP2040 = USB
 ```
 
-| ピン | キー |
+| 役割 | 内容 |
 | --- | --- |
-| D0–D9 | `0`–`9` |
-| D10 | Enter |
+| RP2040 | 約1秒ごとに D0→…→D10 を GND パルス → `0123456789` + Enter |
+| ZMK `batt_1hz_xiao` | スリープなし。打鍵を BLE HID でホストへ |
+| ZMK module `zmk-soak-status` | 約5分ごとにステータス行を HID で打つ: `u<秒>p<% >v<mV>` |
 
-- nRF: shield `batt_1hz_xiao`（スリープなし）／ BLE 名 `Batt1Hz Xiao`
-- RP2040: [`tester-digits-rp2040`](tester-digits-rp2040/tester-digits-rp2040.ino) が約1秒ごとに D0→…→D10 を GND へパルス
-- メモ上の1行 `0123456789` ≒ **11秒**（完成行数 × 11 ≒ 稼働秒）
-- iPad が寝ると行が増えないので、試験中はスリープさせない
+メモ／Notes の例:
 
-UF2:
+```text
+0123456789
+0123456789
+u900p87v3921
+0123456789
+```
 
-- ZMK: `batt_1hz_xiao-xiao_ble__zmk-zmk.uf2`
-- RP2040: Actions [`Build RP2040 digits tester`](.github/workflows/build-rp2040-digits.yml) → `xiao-rp2040-digits-tester.uf2`
+- **持ち時間** … 最後の `u` の秒（または完成した `0123456789` 行数 × 11）
+- **残量／電圧** … `p` / `v`（ボードの電池センサが電圧を出せる場合。ダメなら `v0`）
+- 接続先は触らない **iPad**（自動ロック「しない」＋充電）が楽
+- UF2: `batt_1hz_xiao-…uf2` と Actions `Build RP2040 digits tester`
+
+BattMon（Arduino）は「キー無し・テレメトリ専用」の比較用です。ZMK 実使用に近い負荷はこの shield を使ってください。
 
 ## RP2040 キーテスター（Arduino）
 
@@ -174,9 +184,9 @@ GitHub Actions [`Build RP2040 tester`](.github/workflows/build-rp2040.yml) が U
 
 周期や対象ピンは `tester-rp2040/tester-rp2040.ino` の `INTERVAL_MS` / `TARGET_PIN` で変更できます。
 
-## バッテリー監視（スリープなし / Mac ロガー）
+## バッテリー監視（BattMon・キー無し比較用）
 
-ZMK ではなく **Arduino（Seeed nRF52 / Bluefruit）** の専用ファームです。スリープせず、BLE で起動からの経過時間・推定残量・電圧を約 **5分** ごとに送ります。
+ZMK ではなく Arduino。スリープなしで約5分ごとに `uptime_s` / `%` / `voltage_mv` を Mac ロガーへ送ります。**キー負荷は無い**ので、ZMK＋打鍵の寿命測定には `batt_1hz_xiao` を使ってください。
 
 | 側 | 場所 |
 | --- | --- |
@@ -189,24 +199,18 @@ ZMK ではなく **Arduino（Seeed nRF52 / Bluefruit）** の専用ファーム�
 uptime_s=600 percent=87 voltage_mv=3921
 ```
 
-GATT（Nordic UART ではなく独自サービス）:
-
-- Service `7f5f0001-7a4b-4c8f-9e2d-1b3c5a7e9f01`
-- Characteristic `7f5f0002-…`（Read + Notify）
-
-Mac ロガーは Notify に加え、数秒ごとの Read でも取ります。
 ### ファーム書き込み
 
 1. Actions [`Build batt monitor`](.github/workflows/build-batt-monitor.yml) の Artifact `batt-monitor-firmware` から `xiao-nrf52840-batt-monitor.uf2` を取得  
    （または Arduino IDE: Board = **Seeed XIAO nRF52840** / Seeed nRF52 Boards）
 2. XIAO nRF52840 を `RST` 素早く2回 → ブートローダーへ UF2 をコピー
-3. BLE 名は `BattMon Xiao`。送信時のみ赤 LED が短く点灯（接続中の緑点滅はなし）
+3. BLE 名は `BattMon Xiao`。送信時のみ赤 LED が短く点灯
 
 LiPo は BAT+ / GND に接続。長時間の持ち測定では USB を抜く（挿したままだと充電され電圧が歪む）。
 
 ### Mac 側（Python）
 
-Bluetooth 権限がオンの macOS で:
+Bluetooth 権限がオンの macOS で（試験中は Mac を寝かさない: `caffeinate -dims` など）:
 
 ```bash
 cd mac-batt-logger
@@ -216,16 +220,11 @@ pip install -r requirements.txt
 python logger.py -o ~/Desktop/batt-monitor-log.tsv
 ```
 
-- 接続後すぐ、その後約5分ごとに追記
-- `batt-monitor-log.tsv` … 履歴（TSV）
-- `batt-monitor-log-latest.tsv` … 最新1件だけ上書き
-- 切断時は自動再スキャン／再接続
-- 見つからないときはスキャンで見えたデバイス一覧を出す。`--address` で直接接続も可
-
-OS の「Bluetooth」設定でデバイスをペアリングする必要はありません（ロガーが直接 GATT 接続します）。  
-Terminal / iTerm に **Bluetooth 権限**が必要です（システム設定 → プライバシーとセキュリティ → Bluetooth）。
-
-ファーム書き込み後、起動時に赤→緑→青のセルフテストがあり、送信時だけ赤 LED が点灯します。Reflash 後に GATT が古い場合は Bluetooth を一度オフ／オンしてください。
+- 接続後すぐ、その後約5分ごとに追記（ファーム更新周期）
+- `batt-monitor-log.tsv` … 履歴（`host_iso`, `uptime_s`, `percent`, `voltage_mv`）
+- `batt-monitor-log-latest.tsv` … 最新1件
+- 電池切れで切れたあとは、TSV 最終行の `uptime_s` を持ち時間として読む
+- OS の Bluetooth ペアリングは不要。GATT が古いときは Bluetooth オフ／オン
 
 ## 電源ボタン（Soft Off）
 
@@ -325,6 +324,8 @@ OS の Bluetooth 設定で上記 BLE 名を選択。`BT_CLR` 等は未割り当�
 │   └── batt_monitor_xiao.ino
 ├── tester-digits-rp2040/
 │   └── tester-digits-rp2040.ino
+├── modules/
+│   └── zmk-soak-status/          # periodic u/p/v HID lines for batt_1hz soak
 ├── mac-batt-logger/
 │   ├── logger.py
 │   └── requirements.txt

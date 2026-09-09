@@ -1,14 +1,11 @@
 /*
- * XIAO RP2040 digit-line tester for stacked XIAO nRF52840 (ZMK batt_1hz_xiao).
+ * XIAO RP2040 digit-line load generator for ZMK batt_1hz_xiao soak tests.
  *
- * Cycles D0→D1→…→D9→D10, pulsing each pin LOW (to GND) for PULSE_MS,
- * once per INTERVAL_MS. Other pins stay Hi-Z (INPUT).
+ * Cycles D0→…→D10 (~1 Hz): digits 0–9 + Enter on the nRF (ZMK).
+ * Status lines (uptime / % / mV) are typed by the ZMK soak-status module
+ * every few minutes — this sketch only creates continuous HID load.
  *
- * Expected HID on the nRF side: 0 1 2 3 4 5 6 7 8 9 Enter
- * → one Notes line per 11 pulses ≈ 11 * INTERVAL_MS of runtime.
- *
- * Power: USB on this board. nRF on LiPo. Share GND + D0–D10 only.
- * Do not tie 3V3 / 5V / BAT together.
+ * Power: USB here, LiPo on nRF. Share GND + D0–D10 only (no 3V3/5V/BAT).
  */
 
 constexpr uint8_t PIN_COUNT = 11; // D0 .. D10
@@ -26,7 +23,7 @@ static void allPinsHiZ() {
 
 static void pulsePinToGnd(uint8_t pin) {
   pinMode(PIN_LED_R, OUTPUT);
-  digitalWrite(PIN_LED_R, LOW); // active low
+  digitalWrite(PIN_LED_R, LOW);
 
   pinMode(pin, OUTPUT);
   digitalWrite(pin, LOW);
