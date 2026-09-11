@@ -6,11 +6,9 @@
         compatible = "zmk,keymap";
 
         default_layer {
-            /* D0..D9 = 0..9, D10 = Enter → Notes lines "0123456789" */
+            /* D0=RIGHT, D1=LEFT, D2=ENTER — RP2040 load; status via soak_status */
             bindings = <
-                &kp N0 &kp N1 &kp N2 &kp N3 &kp N4
-                &kp N5 &kp N6 &kp N7 &kp N8 &kp N9
-                &kp ENTER
+                &kp RIGHT &kp LEFT &kp ENTER
             >;
         };
     };

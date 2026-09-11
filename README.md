@@ -17,7 +17,7 @@ Board は `xiao_ble//zmk`。ZMK 本体は [`config/west.yml`](config/west.yml) �
 | `rkjxt_xiao` | Xiao + RKJXT1F42001 一体 | 下表 | 十字・Enter・音量 |
 | `batt_test_xiao` | 電池寿命実験用（D0 キーのみ） | D0 ↔ GND | 30秒おきページめくり想定 |
 | `powerbtn_xiao` | 電源ボタン（ZMK Soft Off） | D0 ↔ GND | 3秒長押しで System OFF / 押して起動 |
-| `batt_1hz_xiao` | ZMK 電池 soak（キー負荷） | D0–D9=0–9 / D10=Enter | RP2040 約1Hz打鍵＋数分おきに u/p/v をHID出力 |
+| `batt_1hz_xiao` | ZMK 電池 soak（キー負荷） | D0=RIGHT / D1=LEFT / D2=Enter | RP2040 約1Hz（RL×4→R→Enter）後に time/power をHID出力 |
 
 BLE 名はそれぞれ `OneKey Xiao` / `Key Xiao` / `Encoder Xiao` / `PushEnc Xiao` / `Fourway Xiao` / `KeyEnc Xiao` / `Rkjxt Xiao` / `BattTest Xiao` / `PowerBtn Xiao` / `Batt1Hz Xiao` です（ZMK の上限は15文字）。
 
@@ -144,31 +144,30 @@ XIAO D0 ----[ switch or external timer ]---- XIAO GND
 最終製品が ZMK 前提なので、**キーをガンガン飛ばしたときの持ち**はこちらで測ります。
 
 ```text
-XIAO nRF D0..D10  ←→  XIAO RP2040 D0..D10
-XIAO nRF GND      ←→  XIAO RP2040 GND
-（3V3 / 5V / BAT は繋がない）
+XIAO nRF D0..D2  ←→  XIAO RP2040 D0..D2
+XIAO nRF GND     ←→  XIAO RP2040 GND
+（3V3 / 5V / BAT は繋がない。旧 D3–D10 配線は外してOK）
 nRF = LiPo / RP2040 = USB
 ```
 
 | 役割 | 内容 |
 | --- | --- |
-| RP2040 | 約1秒ごとに D0→…→D10 を GND パルス → `0123456789` + Enter |
+| RP2040 | `(RIGHT, LEFT)×4 → RIGHT → Enter` を約1Hz。Enter 後に約2秒休止 |
 | ZMK `batt_1hz_xiao` | スリープなし。打鍵を BLE HID でホストへ |
-| ZMK `src/soak_status.c` | 約5分ごとにステータス行を HID で打つ: `u<秒>p<% >v<mV>` |
+| ZMK `src/soak_status.c` | Enter の直後にステータス行を HID で打つ（例: `time: 06915, power=54`） |
 
-メモ／Notes の例:
+メモ／Notes の例（左右キーは空行ではほぼ痕跡なし）:
 
 ```text
-0123456789
-0123456789
-u900p87v3921
-0123456789
+time: 00012, power=99
+time: 00024, power=98
+time: 00036, power=98
 ```
 
-- **持ち時間** … 最後の `u` の秒（または完成した `0123456789` 行数 × 11）
-- **残量／電圧** … `p` / `v`（ボードの電池センサが電圧を出せる場合。ダメなら `v0`）
+- **持ち時間** … 最後の `time:` の秒
+- **残量** … `power=`（%）。電圧が取れるときは `, mv=3921` も付く
 - 接続先は触らない **iPad**（自動ロック「しない」＋充電）が楽
-- UF2: `batt_1hz_xiao-…uf2` と Actions `Build RP2040 digits tester`
+- UF2: `batt_1hz_xiao-…uf2` と Actions `Build RP2040 digits tester`（中身は RIGHT/LEFT/Enter シーケンス）
 
 BattMon（Arduino）は「キー無し・テレメトリ専用」の比較用です。ZMK 実使用に近い負荷はこの shield を使ってください。
 
@@ -325,7 +324,7 @@ OS の Bluetooth 設定で上記 BLE 名を選択。`BT_CLR` 等は未割り当�
 ├── tester-digits-rp2040/
 │   └── tester-digits-rp2040.ino
 ├── src/
-│   └── soak_status.c             # batt_1hz periodic u/p/v HID lines
+│   └── soak_status.c             # batt_1hz status line after Enter
 ├── mac-batt-logger/
 │   ├── logger.py
 │   └── requirements.txt

@@ -1,28 +1,33 @@
 /*
- * Periodic HID status for ZMK battery soak tests.
+ * HID status lines for ZMK battery soak tests.
  *
- * Types: u<uptime_s>p<percent>v<mv><Enter>
- * Example: u3600p87v3921
- *
- * Interleaves with RP2040 digit spam; Notes lines matching ^u[0-9]+p are status.
+ * Default (batt_1hz): after host Enter from the RP2040 cycle, type:
+ *   time: 06915, power=54
+ * Optional when voltage is available:
+ *   time: 06915, power=54, mv=3921
  */
 
 #include <zephyr/kernel.h>
 #include <zephyr/device.h>
 #include <zephyr/drivers/sensor.h>
 #include <zephyr/logging/log.h>
+#include <stdio.h>
 #include <string.h>
 
 #include <zmk/battery.h>
+#include <zmk/event_manager.h>
 #include <zmk/events/keycode_state_changed.h>
+#include <dt-bindings/zmk/hid_usage.h>
+#include <dt-bindings/zmk/hid_usage_pages.h>
 #include <dt-bindings/zmk/keys.h>
 
 LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
 #if IS_ENABLED(CONFIG_ZMK_SOAK_STATUS)
 
-#define MAX_CHARS 48
+#define MAX_CHARS 64
 #define TYPE_DELAY_MS 12
+#define AFTER_ENTER_DELAY_MS 120
 
 static struct k_work_delayable typing_work;
 static struct k_work_delayable schedule_work;
@@ -32,6 +37,7 @@ static uint8_t chars_len;
 static uint8_t current_idx;
 static bool key_pressed;
 static bool typing_busy;
+static bool self_emitting;
 
 static const uint32_t digit_keycodes[10] = {
     N0, N1, N2, N3, N4, N5, N6, N7, N8, N9,
@@ -50,34 +56,39 @@ static uint32_t char_to_keycode(uint8_t ch) {
         return digit_keycodes[ch - '0'];
     }
     switch (ch) {
-    case 'u':
-        return U;
+    case 'a':
+        return A;
+    case 'e':
+        return E;
+    case 'i':
+        return I;
+    case 'm':
+        return M;
+    case 'o':
+        return O;
     case 'p':
         return P;
+    case 'r':
+        return R;
+    case 't':
+        return T;
     case 'v':
         return V;
+    case 'w':
+        return W;
+    case ' ':
+        return SPACE;
+    case ',':
+        return COMMA;
+    case '=':
+        return EQUAL;
+    case ':':
+        /* US QWERTY: Shift + ; */
+        return COLON;
     case '\n':
         return ENTER;
     default:
         return 0;
-    }
-}
-
-static void append_uint(uint32_t v) {
-    uint8_t tmp[10];
-    uint8_t n = 0;
-    if (v == 0) {
-        if (chars_len < MAX_CHARS) {
-            chars[chars_len++] = '0';
-        }
-        return;
-    }
-    while (v > 0 && n < sizeof(tmp)) {
-        tmp[n++] = '0' + (v % 10);
-        v /= 10;
-    }
-    while (n > 0 && chars_len < MAX_CHARS) {
-        chars[chars_len++] = tmp[--n];
     }
 }
 
@@ -98,7 +109,6 @@ static uint16_t read_voltage_mv(void) {
     if (rc != 0) {
         return 0;
     }
-    /* val1 = volts, val2 = µV fraction in Zephyr sensor API */
     if (val.val1 < 0) {
         return 0;
     }
@@ -112,24 +122,33 @@ static void build_status_line(void) {
     const uint32_t uptime_s = k_uptime_get() / 1000;
     uint8_t percent = zmk_battery_state_of_charge();
     uint16_t mv = read_voltage_mv();
+    char line[MAX_CHARS];
+    int n;
 
     if (percent > 100) {
         percent = 100;
     }
 
     reset_typing();
-    /* End any in-progress digit line, then status, then newline. */
-    chars[chars_len++] = '\n';
-    chars[chars_len++] = 'u';
-    append_uint(uptime_s);
-    chars[chars_len++] = 'p';
-    append_uint(percent);
-    chars[chars_len++] = 'v';
-    append_uint(mv);
-    chars[chars_len++] = '\n';
 
+    /* RP2040 already sent Enter; do not prepend another newline. */
+    if (mv > 0) {
+        n = snprintf(line, sizeof(line), "time: %05u, power=%02u, mv=%u\n", uptime_s, percent,
+                     mv);
+    } else {
+        n = snprintf(line, sizeof(line), "time: %05u, power=%02u\n", uptime_s, percent);
+    }
+    if (n < 0) {
+        return;
+    }
+    if (n >= (int)sizeof(line)) {
+        n = (int)sizeof(line) - 1;
+    }
+
+    memcpy(chars, line, n);
+    chars_len = (uint8_t)n;
     typing_busy = true;
-    LOG_INF("soak_status: u=%u p=%u v=%u", uptime_s, percent, mv);
+    LOG_INF("soak_status: %s", line);
 }
 
 static void send_key_step(void) {
@@ -140,13 +159,15 @@ static void send_key_step(void) {
 
     uint32_t keycode = char_to_keycode(chars[current_idx]);
     if (!keycode) {
-        LOG_WRN("soak_status: bad char %u", chars[current_idx]);
+        LOG_WRN("soak_status: bad char '%c' (%u)", chars[current_idx], chars[current_idx]);
         reset_typing();
         return;
     }
 
     bool press = !key_pressed;
+    self_emitting = true;
     raise_zmk_keycode_state_changed_from_encoded(keycode, press, k_uptime_get());
+    self_emitting = false;
     key_pressed = press;
 
     if (press) {
@@ -176,15 +197,42 @@ static void schedule_work_handler(struct k_work *work) {
         LOG_DBG("soak_status: skip, still typing");
     }
 
+#if !IS_ENABLED(CONFIG_ZMK_SOAK_STATUS_ON_ENTER)
     k_work_schedule(&schedule_work, K_SECONDS(CONFIG_ZMK_SOAK_STATUS_INTERVAL_SEC));
+#endif
 }
+
+#if IS_ENABLED(CONFIG_ZMK_SOAK_STATUS_ON_ENTER)
+static int soak_enter_listener(const zmk_event_t *eh) {
+    const struct zmk_keycode_state_changed *ev = as_zmk_keycode_state_changed(eh);
+
+    if (ev == NULL || self_emitting || typing_busy || !ev->state) {
+        return ZMK_EV_EVENT_BUBBLE;
+    }
+    if (ev->usage_page != HID_USAGE_KEY ||
+        ev->keycode != HID_USAGE_KEY_KEYBOARD_RETURN) {
+        return ZMK_EV_EVENT_BUBBLE;
+    }
+
+    /* After RP2040's Enter settles, type the status on the new line. */
+    k_work_schedule(&schedule_work, K_MSEC(AFTER_ENTER_DELAY_MS));
+    return ZMK_EV_EVENT_BUBBLE;
+}
+
+ZMK_LISTENER(soak_status_enter, soak_enter_listener);
+ZMK_SUBSCRIPTION(soak_status_enter, zmk_keycode_state_changed);
+#endif
 
 static int soak_status_init(void) {
     k_work_init_delayable(&typing_work, typing_work_handler);
     k_work_init_delayable(&schedule_work, schedule_work_handler);
     reset_typing();
+#if IS_ENABLED(CONFIG_ZMK_SOAK_STATUS_ON_ENTER)
+    LOG_INF("soak_status: after Enter");
+#else
     k_work_schedule(&schedule_work, K_SECONDS(CONFIG_ZMK_SOAK_STATUS_INITIAL_DELAY_SEC));
     LOG_INF("soak_status: every %d s", CONFIG_ZMK_SOAK_STATUS_INTERVAL_SEC);
+#endif
     return 0;
 }
 
