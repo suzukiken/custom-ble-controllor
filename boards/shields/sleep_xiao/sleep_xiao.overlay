@@ -7,26 +7,23 @@
     };
 
     /*
-     * D0 = load key (RIGHT), D1 = status trigger (&none → soak_status).
-     * Pair with Arduino virtual-finger (D0 every 30s, D1 every 5 min).
+     * D0 = status trigger (&none → soak_status types time/power/mode).
+     * Pair with Arduino virtual-finger (D0 every 5 min).
      */
     kscan0: kscan {
         compatible = "zmk,kscan-gpio-direct";
         wakeup-source;
         debounce-press-ms = <10>;
         debounce-release-ms = <10>;
-        input-gpios
-            = <&xiao_d 0 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>
-            , <&xiao_d 1 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>
-            ;
+        input-gpios = <&xiao_d 0 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>;
     };
 
     default_transform: keymap_transform0 {
         compatible = "zmk,matrix-transform";
-        columns = <2>;
+        columns = <1>;
         rows = <1>;
         map = <
-            RC(0,0) RC(0,1)
+            RC(0,0)
         >;
     };
 

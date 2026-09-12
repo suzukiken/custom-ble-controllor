@@ -6,9 +6,8 @@
         compatible = "zmk,keymap";
 
         default_layer {
-            /* D0=RIGHT (load), D1=status trigger (no HID; soak_status types line) */
+            /* D0=status trigger (no HID key; soak_status types the line) */
             bindings = <
-                &kp RIGHT
                 &none
             >;
         };

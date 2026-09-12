@@ -12,10 +12,10 @@ if ZMK_SOAK_STATUS
 
 config ZMK_SOAK_STATUS_POSITION
 	int "Matrix position that triggers status typing"
-	default 1
+	default 0
 	range 0 15
 	help
-	  Position index in the keymap (0 = D0 load key, 1 = D1 status key).
+	  Position index in the keymap (0 = D0 status key).
 
 config ZMK_SOAK_STATUS_MODE
 	string "Mode label in status line (mode=<label>)"

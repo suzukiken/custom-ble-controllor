@@ -1,7 +1,7 @@
 /*
  * HID status for ZMK battery soak tests.
  *
- * Triggered by matrix position CONFIG_ZMK_SOAK_STATUS_POSITION (D1 by default),
+ * Triggered by matrix position CONFIG_ZMK_SOAK_STATUS_POSITION (D0 by default),
  * typically pulsed every 5 minutes by Arduino virtual-finger.
  *
  * Types e.g.:
