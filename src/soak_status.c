@@ -6,8 +6,8 @@
  *
  * With deep sleep enabled, delayed timers often do not run while asleep, so
  * status is also armed on matrix key activity (virtual finger wake).
- * last_status advances only after a full line is typed, so interrupted
- * attempts can retry on the next wake.
+ * last_status advances when a status attempt starts (not when it finishes),
+ * so wake-key spam cannot emit multiple lines within one interval.
  */
 
 #include <zephyr/kernel.h>
@@ -57,7 +57,6 @@ static void reset_typing(void) {
 }
 
 static void finish_status_ok(void) {
-    last_status_ms = k_uptime_get();
     reset_typing();
 }
 
@@ -196,6 +195,8 @@ static void try_start_status(void) {
         return;
     }
 
+    /* Claim the interval immediately so key spam / wake edges cannot re-fire. */
+    last_status_ms = k_uptime_get();
     build_status_line();
     if (!typing_busy) {
         return;
