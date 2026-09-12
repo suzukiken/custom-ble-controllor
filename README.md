@@ -51,8 +51,8 @@ Board は `xiao_ble//zmk`。ZMK 本体は [`config/west.yml`](config/west.yml) �
 | `fourway_xiao` | `main-board-8` + `4way-re-board`（8ピン, RKJXT1F42001） | 下表 | 十字・Enter・音量 |
 | `key_encoder_xiao` | Xiao + keyswitch + encoder 一体 | D0=SW / D1=A, D2=B, GND | `SPACE` + 方向キー上下 |
 | `rkjxt_xiao` | Xiao + RKJXT1F42001 一体 | 下表 | 十字・Enter・音量 |
-| `sleep_xiao` | 仮想指 30秒 + deep sleep あり | D0 ↔ GND | `virtual-finger-30sec` |
-| `awake_xiao` | 仮想指 30秒 + deep sleep **なし** | D0 ↔ GND | 同じ `virtual-finger-30sec` |
+| `sleep_xiao` | 仮想指 30秒 + deep sleep あり | D0 ↔ GND | `virtual-finger-30sec` + 10分おき status |
+| `awake_xiao` | 仮想指 30秒 + deep sleep **なし** | D0 ↔ GND | 同じ + 10分おき status |
 | `powerbtn_xiao` | 電源ボタン（ZMK Soft Off） | D0 ↔ GND | 3秒長押しで System OFF / 押して起動 |
 
 BLE 名はそれぞれ `OneKey Xiao` / `Key Xiao` / `Encoder Xiao` / `PushEnc Xiao` / `Fourway Xiao` / `KeyEnc Xiao` / `Rkjxt Xiao` / `Sleep Xiao` / `Awake Xiao` / `PowerBtn Xiao` です（ZMK の上限は15文字）。
@@ -160,6 +160,7 @@ XIAO D0 ----[ switch or external timer ]---- XIAO GND
 - キー: `RIGHT`（Kindle で効かなければ `config/sleep_xiao.keymap` を `SPACE` に変更）
 - 入力後 **5秒** でスリープ（`CONFIG_ZMK_IDLE_SLEEP_TIMEOUT=5000`）
 - 30秒周期なら、大半の時間はスリープになる想定
+- **約10分ごと**に HID で `time: 06915, power=54` + Enter（`awake_xiao` も同じ）。Notes 等で残量を追える
 
 #### 実験のやり方
 
@@ -177,7 +178,7 @@ XIAO D0 ----[ switch or external timer ]---- XIAO GND
 
 置き場: [`arduino/xiao-rp2040/virtual-finger-30sec/`](arduino/xiao-rp2040/virtual-finger-30sec/)
 
-XIAO RP2040 が 30 秒周期で `D0` を **500ms** LOW にします（nRF のスリープ復帰＋デバウンス用）。未使用の `D1`–`D10` は Hi-Z。パルス時は赤 LED が点灯します。
+XIAO RP2040 が 30 秒周期で `D0` を **80ms** LOW にします（ホストのキーリピートを避ける短パルス）。未使用の `D1`–`D10` は Hi-Z。パルス時は赤 LED が点灯します。`sleep_xiao` で起きない場合は `PULSE_MS` を少し延ばしてください。
 
 GitHub Actions [`Build Arduino RP2040 virtual-finger-30sec`](.github/workflows/build-arduino-rp2040-virtual-finger-30sec.yml) が UF2 を出します。
 
@@ -282,6 +283,7 @@ OS の Bluetooth 設定で上記 BLE 名を選択。`BT_CLR` 等は未割り当�
 │       └── virtual-finger-30sec/         # ↔ ZMK sleep_xiao / awake_xiao
 ├── config/                               # ZMK conf / keymap / west.yml
 ├── boards/shields/                       # ZMK shields
+├── src/soak_status.c                     # 10分おき time/power HID
 ├── build.yaml
 ├── CMakeLists.txt / Kconfig / zephyr/    # ZMK extra module
 ├── pcb/

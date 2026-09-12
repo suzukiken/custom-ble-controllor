@@ -4,7 +4,8 @@
  * Every INTERVAL_MS, pulse TARGET_PIN low (to GND) for PULSE_MS,
  * then return to Hi-Z (INPUT). Other D0-D10 pins stay Hi-Z.
  *
- * PULSE_MS must cover nRF wake-from-sleep + ZMK debounce.
+ * Keep PULSE_MS short so the host does not start OS key-repeat, but long
+ * enough for ZMK debounce (and usually wake-from-sleep).
  *
  * Pair: arduino/.../virtual-finger-30sec  +  ZMK sleep_xiao or awake_xiao
  * Power: USB on this board. Share GND + GPIO only with LiPo nRF.
@@ -13,8 +14,7 @@
 constexpr uint8_t PIN_COUNT = 11; // D0 .. D10
 constexpr uint8_t TARGET_PIN = D0;
 constexpr uint32_t INTERVAL_MS = 30000;
-// Wake from ZMK deep sleep can take tens–hundreds of ms; keep LOW long enough.
-constexpr uint32_t PULSE_MS = 500;
+constexpr uint32_t PULSE_MS = 80;
 
 static const uint8_t kPins[PIN_COUNT] = {
     D0, D1, D2, D3, D4, D5, D6, D7, D8, D9, D10};
