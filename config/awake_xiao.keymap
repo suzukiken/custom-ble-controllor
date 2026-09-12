@@ -6,9 +6,10 @@
         compatible = "zmk,keymap";
 
         default_layer {
-            /* Kindle-like page turn on iOS (try RIGHT; swap to SPACE if needed) */
+            /* D0=RIGHT (load), D1=status trigger (no HID; soak_status types line) */
             bindings = <
                 &kp RIGHT
+                &none
             >;
         };
     };

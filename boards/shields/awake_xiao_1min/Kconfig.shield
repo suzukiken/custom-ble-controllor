@@ -1,2 +1,0 @@
-config SHIELD_AWAKE_XIAO_1MIN
-	def_bool $(shields_list_contains,awake_xiao_1min)

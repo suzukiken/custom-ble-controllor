@@ -4,8 +4,8 @@ ZMK 以外の Arduino スケッチです（現状は XIAO RP2040 の仮想指の
 
 | フォルダ | MCU | 用途 | ペアになる ZMK |
 | --- | --- | --- | --- |
-| [`xiao-rp2040/virtual-finger-30sec/`](xiao-rp2040/virtual-finger-30sec/) | XIAO RP2040 | 30秒おきに D0 を GND パルス | `sleep_xiao` / `awake_xiao` |
+| [`xiao-rp2040/virtual-finger/`](xiao-rp2040/virtual-finger/) | XIAO RP2040 | D0: 30秒おき負荷 / D1: 5分おき status トリガ | `sleep_xiao` / `awake_xiao` |
 
-積み重ね利用時は **GND + GPIO だけ**共有（3V3 / 5V / BAT は繋がない）。RP2040=USB、nRF=LiPo。
+配線: **D0・D1・GND** を共有（3V3 / 5V / BAT は繋がない）。RP2040=USB、nRF=LiPo。
 
 ZMK 本体はリポジトリ直下の `config/`・`boards/shields/` です。

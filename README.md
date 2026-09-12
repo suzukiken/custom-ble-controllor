@@ -7,14 +7,16 @@ Seeed XIAO 向けのファーム／周辺ツール集です。**スタック（�
 | 種類 | 置き場 | 例 |
 | --- | --- | --- |
 | **ZMK（XIAO nRF52840）** | リポジトリ直下 `config/` + `boards/shields/` | `sleep_xiao`, `onekey_xiao`, … |
-| **Arduino（XIAO RP2040）** | [`arduino/xiao-rp2040/`](arduino/xiao-rp2040/) | `virtual-finger-30sec`（nRF を押す仮想指） |
+| **Arduino（XIAO RP2040）** | [`arduino/xiao-rp2040/`](arduino/xiao-rp2040/) | `virtual-finger`（nRF を押す仮想指） |
 
 積み重ね（nRF + RP2040）のペア:
 
 | ZMK shield（nRF・電池） | RP2040 finger（USB） |
 | --- | --- |
-| `sleep_xiao`（deep sleep **あり**） | [`virtual-finger-30sec`](arduino/xiao-rp2040/virtual-finger-30sec/) |
-| `awake_xiao`（deep sleep **なし**） | 同じ [`virtual-finger-30sec`](arduino/xiao-rp2040/virtual-finger-30sec/) |
+| `sleep_xiao`（deep sleep **あり**） | [`virtual-finger`](arduino/xiao-rp2040/virtual-finger/)（D0+D1） |
+| `awake_xiao`（deep sleep **なし**） | 同じ |
+
+RP2040: **D0** を約30秒おき（負荷=`RIGHT`）、**D1** を約5分おき（status トリガ）。nRF は D1 で `time: …, power=…, mode=…` を打つ。
 
 ### スリープあり／なし比較（手元の機材向け）
 
@@ -22,14 +24,15 @@ Seeed XIAO 向けのファーム／周辺ツール集です。**スタック（�
 
 | 役割 | nRF ファーム | RP2040 | ホスト例 | 見るもの |
 | --- | --- | --- | --- | --- |
-| A | `sleep_xiao`（deep sleep **あり**） | `virtual-finger-30sec` | iPad | 持ち時間 |
-| B | `awake_xiao`（deep sleep **なし**） | `virtual-finger-30sec` | iPhone | 持ち時間 |
-| C | `sleep_xiao`（deep sleep **あり**） | **なし**（接続だけ） | Mac | ベースライン |
+| A | `sleep_xiao`（deep sleep **あり**） | `virtual-finger` | iPad | 持ち時間 |
+| B | `awake_xiao`（deep sleep **なし**） | `virtual-finger` | iPhone | 持ち時間 |
+| C | `sleep_xiao`（deep sleep あり） | **なし**（接続だけ） | Mac | ベースライン |
 
-- 電池3本は満充電から開始。nRF=LiPo / RP2040=USB。GND+D0 のみ共有。
+- 電池3本は満充電から開始。nRF=LiPo / RP2040=USB。**GND + D0 + D1** を共有。
 - ホストはどれも近く・同じ部屋に固定（距離差で再送が増えると壊れる）。
 - 画面は自動ロック「しない」、試験中は寝かさない。
-- 切れ時刻か、最後に動いていた時間で比較。A≪B なら sleep が効いている。A≈B なら接続維持が支配的。
+- Notes 等に約5分ごと `time: …, power=…, mode=sleep|awake` が出る。
+- 切れ時刻か、最後の `time:` で比較。A≪B なら sleep が効いている。A≈B なら接続維持が支配的。
 - C が A より大幅に長いなら「30秒打鍵＋起床」のコストが見える。
 
 詳細は [`arduino/README.md`](arduino/README.md)。ZMK は user-config の都合でルートに残しています。
@@ -51,21 +54,18 @@ Board は `xiao_ble//zmk`。ZMK 本体は [`config/west.yml`](config/west.yml) �
 | `fourway_xiao` | `main-board-8` + `4way-re-board`（8ピン, RKJXT1F42001） | 下表 | 十字・Enter・音量 |
 | `key_encoder_xiao` | Xiao + keyswitch + encoder 一体 | D0=SW / D1=A, D2=B, GND | `SPACE` + 方向キー上下 |
 | `rkjxt_xiao` | Xiao + RKJXT1F42001 一体 | 下表 | 十字・Enter・音量 |
-| `sleep_xiao` | 仮想指 30秒 + deep sleep あり | D0 ↔ GND | `virtual-finger-30sec` + 10分おき status |
-| `sleep_xiao_1min` | `sleep_xiao` の動作確認用 | D0 ↔ GND | status のみ **1分**おき |
-| `sleep_xiao_2min` | `sleep_xiao` の動作確認用 | D0 ↔ GND | status のみ **2分**おき |
-| `sleep_xiao_5min` | `sleep_xiao` の動作確認用 | D0 ↔ GND | status のみ **5分**おき |
-| `awake_xiao` | 仮想指 30秒 + deep sleep **なし** | D0 ↔ GND | 同じ + 10分おき status |
-| `awake_xiao_1min` | `awake_xiao` の動作確認用 | D0 ↔ GND | status のみ **1分**おき |
-| `awake_xiao_5min` | `awake_xiao` の動作確認用 | D0 ↔ GND | status のみ **5分**おき |
+| `sleep_xiao` | 仮想指 + deep sleep あり | D0+D1 ↔ RP2040 | D0=`RIGHT` / D1=status |
+| `awake_xiao` | 仮想指 + deep sleep **なし** | D0+D1 ↔ RP2040 | D0=`RIGHT` / D1=status |
 | `powerbtn_xiao` | 電源ボタン（ZMK Soft Off） | D0 ↔ GND | 3秒長押しで System OFF / 押して起動 |
 
-BLE 名はそれぞれ `OneKey Xiao` / `Key Xiao` / `Encoder Xiao` / `PushEnc Xiao` / `Fourway Xiao` / `KeyEnc Xiao` / `Rkjxt Xiao` / `Sleep Xiao` / `Sleep 1min` / `Sleep 2min` / `Sleep 5min` / `Awake Xiao` / `Awake 1min` / `Awake 5min` / `PowerBtn Xiao` です（ZMK の上限は15文字）。
+BLE 名はそれぞれ `OneKey Xiao` / `Key Xiao` / `Encoder Xiao` / `PushEnc Xiao` / `Fourway Xiao` / `KeyEnc Xiao` / `Rkjxt Xiao` / `Sleep Xiao` / `Awake Xiao` / `PowerBtn Xiao` です（ZMK の上限は15文字）。
+
+status の周期は nRF 側ではなく **RP2040**（既定 5 分）が決めます。
 
 共通設定（各 `config/*.conf`）:
 
 - `CONFIG_ZMK_BLE=y` / `CONFIG_ZMK_USB=n`
-- `CONFIG_ZMK_SLEEP=y` / `CONFIG_ZMK_IDLE_SLEEP_TIMEOUT=60000`（60秒）。`powerbtn_xiao` と `awake_xiao` は `CONFIG_ZMK_SLEEP=n`
+- `sleep_xiao`: `CONFIG_ZMK_SLEEP=y` / `CONFIG_ZMK_IDLE_SLEEP_TIMEOUT=20000`（status 打鍵後に寝る余裕）。`powerbtn_xiao` と `awake_xiao` は `CONFIG_ZMK_SLEEP=n`
 - エンコーダ付きは `CONFIG_EC11=y`
 
 ## 配線
@@ -154,44 +154,48 @@ XIAO D0 ----[ switch ]---- XIAO GND
 
 `zmk,kscan-gpio-direct`。短押しではキーは出ず、3秒長押しで Soft Off（後述）。
 
-### sleep_xiao（deep sleep あり・仮想指 30秒）
+### sleep_xiao / awake_xiao（仮想指 + status）
 
-目的は「BLE 接続したまま、約30秒に1回ページめくり相当のキーが出る」ときの持ち時間の見積もりです。
+目的は「BLE 接続したまま、約30秒に1回ページめくり相当のキーが出る」ときの持ち時間の見積もりです。`sleep_xiao` は deep sleep あり、`awake_xiao` はなし。
 
 ```text
-XIAO D0 ----[ switch or external timer ]---- XIAO GND
+nRF D0 ---- RP2040 D0   (load: RIGHT, ~30s)
+nRF D1 ---- RP2040 D1   (status trigger, ~5min)
+nRF GND --- RP2040 GND
 ```
 
-- キー: `RIGHT`（Kindle で効かなければ `config/sleep_xiao.keymap` を `SPACE` に変更）
-- 入力後 **20秒** でスリープ（`CONFIG_ZMK_IDLE_SLEEP_TIMEOUT=20000`。status 打鍵が終わってから寝る余裕）
-- 30秒周期なら、大半の時間はスリープになる想定
-- **約10分ごと**に HID で `time: 06915, power=54, mode=sleep`（または `mode=awake` / `mode=awake1min`）+ Enter
+- D0 キー: `RIGHT`（Kindle で効かなければ keymap を `SPACE` に変更）
+- D1: keymap は `&none`。`soak_status` が `time: …, power=…, mode=…` + Enter を打つ
+- `sleep_xiao`: 入力後 **20秒** でスリープ（status 打鍵が終わる余裕）
+- status 周期は **RP2040** 側（既定 5 分）。deep sleep 中でも D1 で起きて送信できる
 
 #### 実験のやり方
 
-1. LiPo を XIAO の BAT に接続し、この uf2 を書く
-2. iPhone と `Sleep Xiao` をペアリングし、Kindle を開く
-3. **30秒に1回** D0 を GND へ落とす（手押しでも可）
-4. 電池切れ／電源断まで時間を測る
+1. LiPo を nRF の BAT に接続し、この uf2 を書く
+2. ホストと `Sleep Xiao` / `Awake Xiao` をペアリングし、Notes 等を開く
+3. RP2040 を積み、**GND + D0 + D1** を共有（3V3/5V/BAT は繋がない）。RP2040 は USB 電源
+4. 約5分ごとに Notes に status 行が出ることを確認し、電池切れまで測る
 
-完全自動にしたい場合は、積み重ねた **XIAO RP2040**（[`virtual-finger-30sec`](arduino/xiao-rp2040/virtual-finger-30sec/virtual-finger-30sec.ino)）で30秒ごとに D0 を GND へ落とします。RP2040 は USB 電源、nRF52840 は電池、**GND と GPIO だけ共有**（3V3/5V/BAT は繋がない）。
+見積もりの目安: `稼働時間 = 満充電から不能になるまでの時間`。最後の `time:` でも比較できます。
 
-見積もりの目安: `稼働時間 = 満充電から不能になるまでの時間`。  
-手動と自動で周期がずれても、`回数 × 30秒` から換算できます。
+## virtual-finger（Arduino RP2040）
 
-## virtual-finger-30sec（Arduino RP2040）
+置き場: [`arduino/xiao-rp2040/virtual-finger/`](arduino/xiao-rp2040/virtual-finger/)
 
-置き場: [`arduino/xiao-rp2040/virtual-finger-30sec/`](arduino/xiao-rp2040/virtual-finger-30sec/)
+| ピン | 周期（既定） | nRF 側の意味 |
+| --- | --- | --- |
+| `D0` | 30秒 | 負荷キー（`RIGHT`） |
+| `D1` | 5分 | status トリガ（`soak_status`） |
 
-XIAO RP2040 が 30 秒周期で `D0` を **80ms** LOW にします（ホストのキーリピートを避ける短パルス）。未使用の `D1`–`D10` は Hi-Z。パルス時は赤 LED が点灯します。`sleep_xiao` で起きない場合は `PULSE_MS` を少し延ばしてください。
+どちらも **80ms** LOW パルス（キーリピート回避）。パルス時は赤 LED。起きない場合は `PULSE_MS` を延ばす。起動後約15秒で最初の status が出ます。
 
-GitHub Actions [`Build Arduino RP2040 virtual-finger-30sec`](.github/workflows/build-arduino-rp2040-virtual-finger-30sec.yml) が UF2 を出します。
+GitHub Actions [`Build Arduino RP2040 virtual-finger`](.github/workflows/build-arduino-rp2040-virtual-finger.yml) が UF2 を出します。
 
-1. Actions の Artifacts から `arduino-rp2040-virtual-finger-30sec` をダウンロード
+1. Actions の Artifacts から `arduino-rp2040-virtual-finger` をダウンロード
 2. XIAO RP2040 で **B を押しながら R**（または B 押しながら挿す）→ `RPI-RP2` ドライブ
-3. `xiao-rp2040-virtual-finger-30sec.uf2` をドラッグ&ドロップ
+3. `xiao-rp2040-virtual-finger.uf2` をドラッグ&ドロップ
 
-周期や対象ピンは `virtual-finger-30sec.ino` の `INTERVAL_MS` / `TARGET_PIN` で変更できます。
+周期は `LOAD_INTERVAL_MS` / `STATUS_INTERVAL_MS` で変更できます。
 
 ## 電源ボタン（Soft Off）
 
@@ -233,17 +237,7 @@ include:
   - board: xiao_ble//zmk
     shield: sleep_xiao
   - board: xiao_ble//zmk
-    shield: sleep_xiao_1min
-  - board: xiao_ble//zmk
-    shield: sleep_xiao_2min
-  - board: xiao_ble//zmk
-    shield: sleep_xiao_5min
-  - board: xiao_ble//zmk
     shield: awake_xiao
-  - board: xiao_ble//zmk
-    shield: awake_xiao_1min
-  - board: xiao_ble//zmk
-    shield: awake_xiao_5min
   - board: xiao_ble//zmk
     shield: powerbtn_xiao
   - board: xiao_ble//zmk
@@ -260,12 +254,7 @@ include:
 - `key_encoder_xiao-xiao_ble__zmk-zmk.uf2`
 - `rkjxt_xiao-xiao_ble__zmk-zmk.uf2`
 - `sleep_xiao-xiao_ble__zmk-zmk.uf2`
-- `sleep_xiao_1min-xiao_ble__zmk-zmk.uf2`
-- `sleep_xiao_2min-xiao_ble__zmk-zmk.uf2`
-- `sleep_xiao_5min-xiao_ble__zmk-zmk.uf2`
 - `awake_xiao-xiao_ble__zmk-zmk.uf2`
-- `awake_xiao_1min-xiao_ble__zmk-zmk.uf2`
-- `awake_xiao_5min-xiao_ble__zmk-zmk.uf2`
 - `powerbtn_xiao-xiao_ble__zmk-zmk.uf2`
 - `settings_reset-xiao_ble__zmk-zmk.uf2`（BLE ペアリング復旧用）
 
@@ -296,14 +285,14 @@ OS の Bluetooth 設定で上記 BLE 名を選択。`BT_CLR` 等は未割り当�
 .
 ├── .github/workflows/
 │   ├── build.yml                                      # ZMK (nRF)
-│   └── build-arduino-rp2040-virtual-finger-30sec.yml  # Arduino RP2040
+│   └── build-arduino-rp2040-virtual-finger.yml        # Arduino RP2040
 ├── arduino/
 │   ├── README.md
 │   └── xiao-rp2040/
-│       └── virtual-finger-30sec/         # ↔ ZMK sleep_xiao / awake_xiao
+│       └── virtual-finger/               # ↔ ZMK sleep_xiao / awake_xiao
 ├── config/                               # ZMK conf / keymap / west.yml
 ├── boards/shields/                       # ZMK shields
-├── src/soak_status.c                     # 10分おき time/power HID
+├── src/soak_status.c                     # D1 トリガで time/power HID
 ├── build.yaml
 ├── CMakeLists.txt / Kconfig / zephyr/    # ZMK extra module
 ├── pcb/

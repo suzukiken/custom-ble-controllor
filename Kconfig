@@ -2,23 +2,20 @@
 # Loaded via zephyr/module.yml (ZMK_EXTRA_MODULES = this repo).
 
 config ZMK_SOAK_STATUS
-	bool "Periodic HID soak status lines (uptime / battery %)"
+	bool "HID soak status on status-key press"
 	depends on ZMK_BATTERY_REPORTING
 	help
-	  Every INTERVAL seconds, type a Notes-friendly status line via HID:
-	  time: <uptime_s>, power=<percent> + Enter
+	  When the status matrix position is pressed (RP2040 virtual finger),
+	  type: time: <uptime_s>, power=<percent>, mode=<label> + Enter
 
 if ZMK_SOAK_STATUS
 
-config ZMK_SOAK_STATUS_INTERVAL_SEC
-	int "Seconds between status lines"
-	default 600
-	range 30 86400
-
-config ZMK_SOAK_STATUS_INITIAL_DELAY_SEC
-	int "Seconds before first status line"
-	default 30
-	range 1 600
+config ZMK_SOAK_STATUS_POSITION
+	int "Matrix position that triggers status typing"
+	default 1
+	range 0 15
+	help
+	  Position index in the keymap (0 = D0 load key, 1 = D1 status key).
 
 config ZMK_SOAK_STATUS_MODE
 	string "Mode label in status line (mode=<label>)"
