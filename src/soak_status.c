@@ -1,9 +1,9 @@
 /*
  * Periodic HID status for ZMK battery soak tests (sleep_xiao / awake_xiao).
  *
- * Every INTERVAL seconds, types:
- *   time: 06915, power=54
- * followed by Enter.
+ * Every INTERVAL seconds, types e.g.:
+ *   time: 06915, power=54, mode=sleep
+ * followed by Enter. mode=awake when deep sleep is disabled.
  */
 
 #include <zephyr/kernel.h>
@@ -19,7 +19,7 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
 #if IS_ENABLED(CONFIG_ZMK_SOAK_STATUS)
 
-#define MAX_CHARS 48
+#define MAX_CHARS 56
 #define TYPE_DELAY_MS 12
 
 static struct k_work_delayable typing_work;
@@ -54,6 +54,10 @@ static uint32_t char_to_keycode(uint8_t ch) {
         return E;
     case 'i':
         return I;
+    case 'k':
+        return K;
+    case 'l':
+        return L;
     case 'm':
         return M;
     case 'o':
@@ -62,6 +66,8 @@ static uint32_t char_to_keycode(uint8_t ch) {
         return P;
     case 'r':
         return R;
+    case 's':
+        return S;
     case 't':
         return T;
     case 'w':
@@ -84,6 +90,7 @@ static uint32_t char_to_keycode(uint8_t ch) {
 static void build_status_line(void) {
     const uint32_t uptime_s = k_uptime_get() / 1000;
     uint8_t percent = zmk_battery_state_of_charge();
+    const char *mode = IS_ENABLED(CONFIG_ZMK_SLEEP) ? "sleep" : "awake";
     char line[MAX_CHARS];
     int n;
 
@@ -93,7 +100,8 @@ static void build_status_line(void) {
 
     reset_typing();
 
-    n = snprintf(line, sizeof(line), "time: %05u, power=%02u\n", uptime_s, percent);
+    n = snprintf(line, sizeof(line), "time: %05u, power=%02u, mode=%s\n", uptime_s, percent,
+                 mode);
     if (n < 0) {
         return;
     }
