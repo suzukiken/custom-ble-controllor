@@ -1,0 +1,17 @@
+#include <behaviors.dtsi>
+
+&soft_off {
+    hold-time-ms = <3000>;
+};
+
+/ {
+    keymap {
+        compatible = "zmk,keymap";
+
+        default_layer {
+            bindings = <
+                &soft_off
+            >;
+        };
+    };
+};

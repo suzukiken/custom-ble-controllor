@@ -7,8 +7,8 @@
     };
 
     /*
-     * Battery life experiment: one key = page turn (RIGHT).
-     * Wire a switch (or external timer) between D0 and GND.
+     * D0 = status trigger (&none → soak_status types time/power/mode).
+     * Pair with Arduino virtual-finger (D0 every 5 min).
      */
     kscan0: kscan {
         compatible = "zmk,kscan-gpio-direct";

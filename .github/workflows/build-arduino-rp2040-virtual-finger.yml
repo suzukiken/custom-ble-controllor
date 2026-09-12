@@ -1,14 +1,14 @@
-name: Build RP2040 tester
+name: Build Arduino RP2040 virtual-finger
 
 on:
   push:
     paths:
-      - "tester-rp2040/**"
-      - ".github/workflows/build-rp2040.yml"
+      - "arduino/xiao-rp2040/virtual-finger/**"
+      - ".github/workflows/build-arduino-rp2040-virtual-finger.yml"
   pull_request:
     paths:
-      - "tester-rp2040/**"
-      - ".github/workflows/build-rp2040.yml"
+      - "arduino/xiao-rp2040/virtual-finger/**"
+      - ".github/workflows/build-arduino-rp2040-virtual-finger.yml"
   workflow_dispatch:
 
 jobs:
@@ -35,14 +35,14 @@ jobs:
           arduino-cli compile \
             --fqbn rp2040:rp2040:seeed_xiao_rp2040 \
             --output-dir out \
-            tester-rp2040
+            arduino/xiao-rp2040/virtual-finger
           ls -la out
           UF2=$(find out -name '*.uf2' | head -n 1)
           test -n "$UF2"
-          cp "$UF2" out/xiao-rp2040-key-tester.uf2
+          cp "$UF2" out/xiao-rp2040-virtual-finger.uf2
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: rp2040-tester-firmware
-          path: out/xiao-rp2040-key-tester.uf2
+          name: arduino-rp2040-virtual-finger
+          path: out/xiao-rp2040-virtual-finger.uf2

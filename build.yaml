@@ -14,6 +14,10 @@ include:
   - board: xiao_ble//zmk
     shield: rkjxt_xiao
   - board: xiao_ble//zmk
-    shield: batt_test_xiao
+    shield: sleep_xiao
+  - board: xiao_ble//zmk
+    shield: awake_xiao
+  - board: xiao_ble//zmk
+    shield: powerbtn_xiao
   - board: xiao_ble//zmk
     shield: settings_reset

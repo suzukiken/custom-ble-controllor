@@ -1,0 +1,25 @@
+# SPDX-License-Identifier: MIT
+# Loaded via zephyr/module.yml (ZMK_EXTRA_MODULES = this repo).
+
+config ZMK_SOAK_STATUS
+	bool "HID soak status on status-key press"
+	depends on ZMK_BATTERY_REPORTING
+	help
+	  When the status matrix position is pressed (RP2040 virtual finger),
+	  type: time: <uptime_s>, power=<percent>, mode=<label> + Enter
+
+if ZMK_SOAK_STATUS
+
+config ZMK_SOAK_STATUS_POSITION
+	int "Matrix position that triggers status typing"
+	default 0
+	range 0 15
+	help
+	  Position index in the keymap (0 = D0 status key).
+
+config ZMK_SOAK_STATUS_MODE
+	string "Mode label in status line (mode=<label>)"
+	default "sleep" if ZMK_SLEEP
+	default "awake"
+
+endif

@@ -1,5 +1,8 @@
 /build/
-/tester-rp2040/build/
+/arduino/**/build/
+__pycache__/
+*.py[cod]
+.arduino15/
 /out/
 /modules/
 /tools/
