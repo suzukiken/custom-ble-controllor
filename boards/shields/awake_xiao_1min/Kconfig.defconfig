@@ -1,0 +1,6 @@
+if SHIELD_AWAKE_XIAO_1MIN
+
+config ZMK_KEYBOARD_NAME
+	default "Awake 1min"
+
+endif
