@@ -25,8 +25,9 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
 #define MAX_CHARS 64
 #define TYPE_DELAY_MS 12
-#define AFTER_TRIGGER_MS 300
-#define TYPING_STUCK_MS 5000
+/* After deep-sleep wake, wait for BLE reconnect before HID typing. */
+#define AFTER_TRIGGER_MS 2000
+#define TYPING_STUCK_MS 8000
 #define RETRIGGER_GAP_MS 2000
 
 static struct k_work_delayable typing_work;

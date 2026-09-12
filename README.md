@@ -187,7 +187,7 @@ nRF GND --- RP2040 GND
 | `D0` | 30秒 | 負荷キー（`RIGHT`） |
 | `D1` | 5分 | status トリガ（`soak_status`） |
 
-どちらも **80ms** LOW パルス（キーリピート回避）。パルス時は赤 LED。起きない場合は `PULSE_MS` を延ばす。起動後約15秒で最初の status が出ます。
+どちらも LOW パルス（キーリピート回避）。**status は 1.5秒**（deep sleep 起床＋スキャン検出用）、負荷は 120ms。パルス時は赤 LED。起動後約15秒で最初の status が出ます。
 
 GitHub Actions [`Build Arduino RP2040 virtual-finger`](.github/workflows/build-arduino-rp2040-virtual-finger.yml) が UF2 を出します。
 

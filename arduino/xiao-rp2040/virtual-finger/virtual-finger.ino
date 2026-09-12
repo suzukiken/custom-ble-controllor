@@ -6,24 +6,28 @@
  *
  * Wiring: nRF D0↔RP2040 D0, nRF D1↔RP2040 D1, GND shared.
  * USB on RP2040, LiPo on nRF. Do not tie 3V3/5V/BAT.
+ *
+ * STATUS_PULSE_MS must stay LOW long enough for nRF deep-sleep wake +
+ * kscan debounce; 80ms is fine while awake but often too short after sleep.
  */
 
 constexpr uint8_t PIN_LOAD = D0;
 constexpr uint8_t PIN_STATUS = D1;
 constexpr uint32_t LOAD_INTERVAL_MS = 30000;
 constexpr uint32_t STATUS_INTERVAL_MS = 300000; // 5 minutes
-constexpr uint32_t PULSE_MS = 80;
+constexpr uint32_t LOAD_PULSE_MS = 120;
+constexpr uint32_t STATUS_PULSE_MS = 1500;
 
 static uint32_t last_load_ms = 0;
 static uint32_t last_status_ms = 0;
 
-static void pulsePinToGnd(uint8_t pin) {
+static void pulsePinToGnd(uint8_t pin, uint32_t pulse_ms) {
   pinMode(PIN_LED_R, OUTPUT);
   digitalWrite(PIN_LED_R, LOW);
 
   pinMode(pin, OUTPUT);
   digitalWrite(pin, LOW);
-  delay(PULSE_MS);
+  delay(pulse_ms);
   pinMode(pin, INPUT);
 
   digitalWrite(PIN_LED_R, HIGH);
@@ -46,11 +50,11 @@ void loop() {
 
   if ((now - last_load_ms) >= LOAD_INTERVAL_MS) {
     last_load_ms = now;
-    pulsePinToGnd(PIN_LOAD);
+    pulsePinToGnd(PIN_LOAD, LOAD_PULSE_MS);
   }
 
   if ((now - last_status_ms) >= STATUS_INTERVAL_MS) {
     last_status_ms = now;
-    pulsePinToGnd(PIN_STATUS);
+    pulsePinToGnd(PIN_STATUS, STATUS_PULSE_MS);
   }
 }
