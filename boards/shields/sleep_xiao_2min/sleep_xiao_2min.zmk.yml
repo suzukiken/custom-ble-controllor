@@ -1,0 +1,8 @@
+file_format: "1"
+id: sleep_xiao_2min
+name: Sleep 2min
+type: shield
+url: https://github.com/zmkfirmware/zmk
+requires: [seeed_xiao]
+features:
+  - keys

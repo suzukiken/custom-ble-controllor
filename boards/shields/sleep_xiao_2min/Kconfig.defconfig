@@ -1,0 +1,6 @@
+if SHIELD_SLEEP_XIAO_2MIN
+
+config ZMK_KEYBOARD_NAME
+	default "Sleep 2min"
+
+endif
