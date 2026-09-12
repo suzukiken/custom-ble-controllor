@@ -26,6 +26,8 @@ include:
   - board: xiao_ble//zmk
     shield: awake_xiao_1min
   - board: xiao_ble//zmk
+    shield: awake_xiao_5min
+  - board: xiao_ble//zmk
     shield: powerbtn_xiao
   - board: xiao_ble//zmk
     shield: settings_reset
