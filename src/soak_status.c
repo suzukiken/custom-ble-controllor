@@ -1,9 +1,11 @@
 /*
- * Periodic HID status for ZMK battery soak tests (sleep_xiao / awake_xiao).
+ * Periodic HID status for ZMK battery soak tests.
  *
- * Every INTERVAL seconds, types e.g.:
+ * Types e.g.:
  *   time: 06915, power=54, mode=sleep
- * mode label comes from CONFIG_ZMK_SOAK_STATUS_MODE.
+ *
+ * With deep sleep enabled, delayed timers often do not run while asleep, so
+ * status is also armed on matrix key activity (virtual finger wake).
  */
 
 #include <zephyr/kernel.h>
@@ -12,7 +14,10 @@
 #include <string.h>
 
 #include <zmk/battery.h>
+#include <zmk/event_manager.h>
 #include <zmk/events/keycode_state_changed.h>
+#include <dt-bindings/zmk/hid_usage.h>
+#include <dt-bindings/zmk/hid_usage_pages.h>
 #include <dt-bindings/zmk/keys.h>
 
 LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
@@ -21,6 +26,9 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
 #define MAX_CHARS 64
 #define TYPE_DELAY_MS 12
+#define AFTER_KEY_DELAY_MS 150
+/* Poll while awake; deep sleep still relies on key activity below. */
+#define POLL_SEC 30
 
 static struct k_work_delayable typing_work;
 static struct k_work_delayable schedule_work;
@@ -30,6 +38,8 @@ static uint8_t chars_len;
 static uint8_t current_idx;
 static bool key_pressed;
 static bool typing_busy;
+static bool self_emitting;
+static int64_t last_status_ms = -1;
 
 static const uint32_t digit_keycodes[10] = {
     N0, N1, N2, N3, N4, N5, N6, N7, N8, N9,
@@ -91,6 +101,15 @@ static uint32_t char_to_keycode(uint8_t ch) {
     }
 }
 
+static bool due_for_status(void) {
+    const int64_t now = k_uptime_get();
+
+    if (last_status_ms < 0) {
+        return now >= ((int64_t)CONFIG_ZMK_SOAK_STATUS_INITIAL_DELAY_SEC * 1000);
+    }
+    return (now - last_status_ms) >= ((int64_t)CONFIG_ZMK_SOAK_STATUS_INTERVAL_SEC * 1000);
+}
+
 static void build_status_line(void) {
     const uint32_t uptime_s = k_uptime_get() / 1000;
     uint8_t percent = zmk_battery_state_of_charge();
@@ -132,7 +151,9 @@ static void send_key_step(void) {
     }
 
     bool press = !key_pressed;
+    self_emitting = true;
     raise_zmk_keycode_state_changed_from_encoded(keycode, press, k_uptime_get());
+    self_emitting = false;
     key_pressed = press;
 
     if (press) {
@@ -147,6 +168,16 @@ static void send_key_step(void) {
     }
 }
 
+static void try_start_status(void) {
+    if (typing_busy || !due_for_status()) {
+        return;
+    }
+
+    last_status_ms = k_uptime_get();
+    build_status_line();
+    send_key_step();
+}
+
 static void typing_work_handler(struct k_work *work) {
     ARG_UNUSED(work);
     send_key_step();
@@ -154,23 +185,38 @@ static void typing_work_handler(struct k_work *work) {
 
 static void schedule_work_handler(struct k_work *work) {
     ARG_UNUSED(work);
+    try_start_status();
+    k_work_schedule(&schedule_work, K_SECONDS(POLL_SEC));
+}
 
-    if (!typing_busy) {
-        build_status_line();
-        send_key_step();
-    } else {
-        LOG_DBG("soak_status: skip, still typing");
+#if IS_ENABLED(CONFIG_ZMK_SLEEP)
+/* Deep sleep skips delayed timers; arm status after virtual-finger wakes us. */
+static int soak_activity_listener(const zmk_event_t *eh) {
+    const struct zmk_keycode_state_changed *ev = as_zmk_keycode_state_changed(eh);
+
+    if (ev == NULL || self_emitting || typing_busy || ev->state) {
+        return ZMK_EV_EVENT_BUBBLE;
+    }
+    if (!due_for_status()) {
+        return ZMK_EV_EVENT_BUBBLE;
     }
 
-    k_work_schedule(&schedule_work, K_SECONDS(CONFIG_ZMK_SOAK_STATUS_INTERVAL_SEC));
+    k_work_schedule(&schedule_work, K_MSEC(AFTER_KEY_DELAY_MS));
+    return ZMK_EV_EVENT_BUBBLE;
 }
+
+ZMK_LISTENER(soak_status_activity, soak_activity_listener);
+ZMK_SUBSCRIPTION(soak_status_activity, zmk_keycode_state_changed);
+#endif
 
 static int soak_status_init(void) {
     k_work_init_delayable(&typing_work, typing_work_handler);
     k_work_init_delayable(&schedule_work, schedule_work_handler);
     reset_typing();
+    last_status_ms = -1;
     k_work_schedule(&schedule_work, K_SECONDS(CONFIG_ZMK_SOAK_STATUS_INITIAL_DELAY_SEC));
-    LOG_INF("soak_status: every %d s", CONFIG_ZMK_SOAK_STATUS_INTERVAL_SEC);
+    LOG_INF("soak_status: mode=%s every %d s", CONFIG_ZMK_SOAK_STATUS_MODE,
+            CONFIG_ZMK_SOAK_STATUS_INTERVAL_SEC);
     return 0;
 }
 
