@@ -3,7 +3,7 @@
  *
  * Every INTERVAL seconds, types e.g.:
  *   time: 06915, power=54, mode=sleep
- * followed by Enter. mode=awake when deep sleep is disabled.
+ * mode label comes from CONFIG_ZMK_SOAK_STATUS_MODE.
  */
 
 #include <zephyr/kernel.h>
@@ -19,7 +19,7 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
 #if IS_ENABLED(CONFIG_ZMK_SOAK_STATUS)
 
-#define MAX_CHARS 56
+#define MAX_CHARS 64
 #define TYPE_DELAY_MS 12
 
 static struct k_work_delayable typing_work;
@@ -50,6 +50,8 @@ static uint32_t char_to_keycode(uint8_t ch) {
     switch (ch) {
     case 'a':
         return A;
+    case 'd':
+        return D;
     case 'e':
         return E;
     case 'i':
@@ -60,6 +62,8 @@ static uint32_t char_to_keycode(uint8_t ch) {
         return L;
     case 'm':
         return M;
+    case 'n':
+        return N;
     case 'o':
         return O;
     case 'p':
@@ -90,7 +94,6 @@ static uint32_t char_to_keycode(uint8_t ch) {
 static void build_status_line(void) {
     const uint32_t uptime_s = k_uptime_get() / 1000;
     uint8_t percent = zmk_battery_state_of_charge();
-    const char *mode = IS_ENABLED(CONFIG_ZMK_SLEEP) ? "sleep" : "awake";
     char line[MAX_CHARS];
     int n;
 
@@ -101,7 +104,7 @@ static void build_status_line(void) {
     reset_typing();
 
     n = snprintf(line, sizeof(line), "time: %05u, power=%02u, mode=%s\n", uptime_s, percent,
-                 mode);
+                 CONFIG_ZMK_SOAK_STATUS_MODE);
     if (n < 0) {
         return;
     }

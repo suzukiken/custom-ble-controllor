@@ -161,7 +161,7 @@ XIAO D0 ----[ switch or external timer ]---- XIAO GND
 - キー: `RIGHT`（Kindle で効かなければ `config/sleep_xiao.keymap` を `SPACE` に変更）
 - 入力後 **5秒** でスリープ（`CONFIG_ZMK_IDLE_SLEEP_TIMEOUT=5000`）
 - 30秒周期なら、大半の時間はスリープになる想定
-- **約10分ごと**に HID で `time: 06915, power=54, mode=sleep`（または `mode=awake`）+ Enter。Notes 等で残量を追える
+- **約10分ごと**に HID で `time: 06915, power=54, mode=sleep`（または `mode=awake` / `mode=awake1min`）+ Enter
 
 #### 実験のやり方
 

@@ -20,4 +20,9 @@ config ZMK_SOAK_STATUS_INITIAL_DELAY_SEC
 	default 30
 	range 1 600
 
+config ZMK_SOAK_STATUS_MODE
+	string "Mode label in status line (mode=<label>)"
+	default "sleep" if ZMK_SLEEP
+	default "awake"
+
 endif
