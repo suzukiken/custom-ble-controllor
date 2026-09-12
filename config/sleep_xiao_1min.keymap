@@ -1,0 +1,15 @@
+#include <behaviors.dtsi>
+#include <dt-bindings/zmk/keys.h>
+
+/ {
+    keymap {
+        compatible = "zmk,keymap";
+
+        default_layer {
+            /* Kindle-like page turn on iOS (try RIGHT; swap to SPACE if needed) */
+            bindings = <
+                &kp RIGHT
+            >;
+        };
+    };
+};

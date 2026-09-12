@@ -52,11 +52,12 @@ Board は `xiao_ble//zmk`。ZMK 本体は [`config/west.yml`](config/west.yml) �
 | `key_encoder_xiao` | Xiao + keyswitch + encoder 一体 | D0=SW / D1=A, D2=B, GND | `SPACE` + 方向キー上下 |
 | `rkjxt_xiao` | Xiao + RKJXT1F42001 一体 | 下表 | 十字・Enter・音量 |
 | `sleep_xiao` | 仮想指 30秒 + deep sleep あり | D0 ↔ GND | `virtual-finger-30sec` + 10分おき status |
+| `sleep_xiao_1min` | `sleep_xiao` の動作確認用 | D0 ↔ GND | status のみ **1分**おき |
 | `awake_xiao` | 仮想指 30秒 + deep sleep **なし** | D0 ↔ GND | 同じ + 10分おき status |
 | `awake_xiao_1min` | `awake_xiao` の動作確認用 | D0 ↔ GND | status のみ **1分**おき |
 | `powerbtn_xiao` | 電源ボタン（ZMK Soft Off） | D0 ↔ GND | 3秒長押しで System OFF / 押して起動 |
 
-BLE 名はそれぞれ `OneKey Xiao` / `Key Xiao` / `Encoder Xiao` / `PushEnc Xiao` / `Fourway Xiao` / `KeyEnc Xiao` / `Rkjxt Xiao` / `Sleep Xiao` / `Awake Xiao` / `Awake 1min` / `PowerBtn Xiao` です（ZMK の上限は15文字）。
+BLE 名はそれぞれ `OneKey Xiao` / `Key Xiao` / `Encoder Xiao` / `PushEnc Xiao` / `Fourway Xiao` / `KeyEnc Xiao` / `Rkjxt Xiao` / `Sleep Xiao` / `Sleep 1min` / `Awake Xiao` / `Awake 1min` / `PowerBtn Xiao` です（ZMK の上限は15文字）。
 
 共通設定（各 `config/*.conf`）:
 
@@ -229,6 +230,8 @@ include:
   - board: xiao_ble//zmk
     shield: sleep_xiao
   - board: xiao_ble//zmk
+    shield: sleep_xiao_1min
+  - board: xiao_ble//zmk
     shield: awake_xiao
   - board: xiao_ble//zmk
     shield: awake_xiao_1min
@@ -248,6 +251,7 @@ include:
 - `key_encoder_xiao-xiao_ble__zmk-zmk.uf2`
 - `rkjxt_xiao-xiao_ble__zmk-zmk.uf2`
 - `sleep_xiao-xiao_ble__zmk-zmk.uf2`
+- `sleep_xiao_1min-xiao_ble__zmk-zmk.uf2`
 - `awake_xiao-xiao_ble__zmk-zmk.uf2`
 - `awake_xiao_1min-xiao_ble__zmk-zmk.uf2`
 - `powerbtn_xiao-xiao_ble__zmk-zmk.uf2`

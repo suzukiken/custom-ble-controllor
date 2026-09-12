@@ -16,6 +16,8 @@ include:
   - board: xiao_ble//zmk
     shield: sleep_xiao
   - board: xiao_ble//zmk
+    shield: sleep_xiao_1min
+  - board: xiao_ble//zmk
     shield: awake_xiao
   - board: xiao_ble//zmk
     shield: awake_xiao_1min
