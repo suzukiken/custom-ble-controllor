@@ -2,12 +2,11 @@
  * Periodic HID status for ZMK battery soak tests.
  *
  * Types e.g.:
- *   time: 06915, power=54, mode=sleep
+ *   time: 06915, power=54, mode=sleep5min
  *
- * With deep sleep enabled, delayed timers often do not run while asleep, so
- * status is also armed on matrix key activity (virtual finger wake).
- * last_status advances when a status attempt starts (not when it finishes),
- * so wake-key spam cannot emit multiple lines within one interval.
+ * Deep sleep often skips delayed timers, so when CONFIG_ZMK_SLEEP is set we
+ * mainly arm status after virtual-finger wake. Successful sends advance the
+ * interval clock; failed/interrupted sends may retry after a short gap.
  */
 
 #include <zephyr/kernel.h>
@@ -26,9 +25,10 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
 #define MAX_CHARS 64
 #define TYPE_DELAY_MS 12
-#define AFTER_KEY_DELAY_MS 400
+#define AFTER_KEY_DELAY_MS 500
 #define TYPING_STUCK_MS 5000
-/* Poll while awake; deep sleep still relies on key activity below. */
+/* Prevents wake-key spam; much shorter than INTERVAL. */
+#define ATTEMPT_GAP_MS 5000
 #define POLL_SEC 30
 
 static struct k_work_delayable typing_work;
@@ -40,7 +40,10 @@ static uint8_t current_idx;
 static bool key_pressed;
 static bool typing_busy;
 static bool self_emitting;
-static int64_t last_status_ms = -1;
+/* Last fully completed status (interval anchor). -1 = never succeeded. */
+static int64_t last_success_ms = -1;
+/* Last try_start (anti-spam). */
+static int64_t last_attempt_ms = -1;
 static int64_t typing_started_ms;
 
 static const uint32_t digit_keycodes[10] = {
@@ -57,6 +60,7 @@ static void reset_typing(void) {
 }
 
 static void finish_status_ok(void) {
+    last_success_ms = k_uptime_get();
     reset_typing();
 }
 
@@ -108,13 +112,20 @@ static uint32_t char_to_keycode(uint8_t ch) {
     }
 }
 
-static bool due_for_status(void) {
+static bool interval_elapsed(void) {
     const int64_t now = k_uptime_get();
 
-    if (last_status_ms < 0) {
+    if (last_success_ms < 0) {
         return now >= ((int64_t)CONFIG_ZMK_SOAK_STATUS_INITIAL_DELAY_SEC * 1000);
     }
-    return (now - last_status_ms) >= ((int64_t)CONFIG_ZMK_SOAK_STATUS_INTERVAL_SEC * 1000);
+    return (now - last_success_ms) >= ((int64_t)CONFIG_ZMK_SOAK_STATUS_INTERVAL_SEC * 1000);
+}
+
+static bool attempt_gap_ok(void) {
+    if (last_attempt_ms < 0) {
+        return true;
+    }
+    return (k_uptime_get() - last_attempt_ms) >= ATTEMPT_GAP_MS;
 }
 
 static void clear_stuck_typing(void) {
@@ -191,12 +202,11 @@ static void send_key_step(void) {
 static void try_start_status(void) {
     clear_stuck_typing();
 
-    if (typing_busy || !due_for_status()) {
+    if (typing_busy || !interval_elapsed() || !attempt_gap_ok()) {
         return;
     }
 
-    /* Claim the interval immediately so key spam / wake edges cannot re-fire. */
-    last_status_ms = k_uptime_get();
+    last_attempt_ms = k_uptime_get();
     build_status_line();
     if (!typing_busy) {
         return;
@@ -212,11 +222,12 @@ static void typing_work_handler(struct k_work *work) {
 static void schedule_work_handler(struct k_work *work) {
     ARG_UNUSED(work);
     try_start_status();
+#if !IS_ENABLED(CONFIG_ZMK_SLEEP)
     k_work_schedule(&schedule_work, K_SECONDS(POLL_SEC));
+#endif
 }
 
 #if IS_ENABLED(CONFIG_ZMK_SLEEP)
-/* Deep sleep skips delayed timers; arm status after virtual-finger wakes us. */
 static int soak_activity_listener(const zmk_event_t *eh) {
     const struct zmk_keycode_state_changed *ev = as_zmk_keycode_state_changed(eh);
 
@@ -226,11 +237,10 @@ static int soak_activity_listener(const zmk_event_t *eh) {
 
     clear_stuck_typing();
 
-    if (typing_busy || !due_for_status()) {
+    if (typing_busy || !interval_elapsed() || !attempt_gap_ok()) {
         return ZMK_EV_EVENT_BUBBLE;
     }
 
-    /* Let the wake key finish, then type while still in the idle-timeout window. */
     k_work_schedule(&schedule_work, K_MSEC(AFTER_KEY_DELAY_MS));
     return ZMK_EV_EVENT_BUBBLE;
 }
@@ -243,10 +253,17 @@ static int soak_status_init(void) {
     k_work_init_delayable(&typing_work, typing_work_handler);
     k_work_init_delayable(&schedule_work, schedule_work_handler);
     reset_typing();
-    last_status_ms = -1;
+    last_success_ms = -1;
+    last_attempt_ms = -1;
+#if IS_ENABLED(CONFIG_ZMK_SLEEP)
+    /* Prefer first status on finger wake after INITIAL_DELAY (timers sleep poorly). */
+    LOG_INF("soak_status: mode=%s every %d s (on wake)", CONFIG_ZMK_SOAK_STATUS_MODE,
+            CONFIG_ZMK_SOAK_STATUS_INTERVAL_SEC);
+#else
     k_work_schedule(&schedule_work, K_SECONDS(CONFIG_ZMK_SOAK_STATUS_INITIAL_DELAY_SEC));
     LOG_INF("soak_status: mode=%s every %d s", CONFIG_ZMK_SOAK_STATUS_MODE,
             CONFIG_ZMK_SOAK_STATUS_INTERVAL_SEC);
+#endif
     return 0;
 }
 
