@@ -7,8 +7,8 @@
     };
 
     /*
-     * Battery life experiment: one key = page turn (RIGHT).
-     * Wire a switch (or external timer) between D0 and GND.
+     * awake_xiao: same wiring/keys as sleep_xiao, but no deep sleep.
+     * Pair with Arduino virtual-finger-30sec for sleep-on vs sleep-off tests.
      */
     kscan0: kscan {
         compatible = "zmk,kscan-gpio-direct";

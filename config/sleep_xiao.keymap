@@ -6,9 +6,9 @@
         compatible = "zmk,keymap";
 
         default_layer {
-            /* D0=RIGHT, D1=LEFT, D2=ENTER — RP2040 load; status via soak_status */
+            /* Kindle-like page turn on iOS (try RIGHT; swap to SPACE if needed) */
             bindings = <
-                &kp RIGHT &kp LEFT &kp ENTER
+                &kp RIGHT
             >;
         };
     };

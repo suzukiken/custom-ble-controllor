@@ -1,6 +1,0 @@
-if SHIELD_BATT_1HZ_XIAO
-
-config ZMK_KEYBOARD_NAME
-	default "Batt1Hz Xiao"
-
-endif

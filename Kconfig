@@ -1,33 +1,3 @@
 # SPDX-License-Identifier: MIT
 # Loaded via zephyr/module.yml (ZMK_EXTRA_MODULES = this repo).
-
-config ZMK_SOAK_STATUS
-	bool "HID soak status lines (uptime / battery)"
-	depends on ZMK_BATTERY_REPORTING
-	help
-	  Type a Notes-friendly status line via HID, e.g.
-	  time: 06915, power=54
-	  Use with batt_1hz_xiao key load to measure ZMK battery life under load.
-
-if ZMK_SOAK_STATUS
-
-config ZMK_SOAK_STATUS_ON_ENTER
-	bool "Type status line after Enter key"
-	default y
-	help
-	  When the matrix Enter key is pressed (RP2040 cycle end), type the
-	  status line. Disables the periodic timer below.
-
-config ZMK_SOAK_STATUS_INTERVAL_SEC
-	int "Seconds between status lines (if not ON_ENTER)"
-	default 300
-	range 30 86400
-	depends on !ZMK_SOAK_STATUS_ON_ENTER
-
-config ZMK_SOAK_STATUS_INITIAL_DELAY_SEC
-	int "Seconds before first status line (if not ON_ENTER)"
-	default 15
-	range 1 600
-	depends on !ZMK_SOAK_STATUS_ON_ENTER
-
-endif
+# No extra Kconfig options currently.

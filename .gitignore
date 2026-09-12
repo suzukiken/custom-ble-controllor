@@ -1,9 +1,5 @@
 /build/
-/tester-rp2040/build/
-/tester-digits-rp2040/build/
-/batt_monitor_xiao/build/
-/mac-batt-logger/.venv/
-/mac-batt-logger/**/*.tsv
+/arduino/**/build/
 __pycache__/
 *.py[cod]
 .arduino15/

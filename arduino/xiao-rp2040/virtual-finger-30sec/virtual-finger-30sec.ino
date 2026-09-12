@@ -1,14 +1,13 @@
 /*
- * XIAO RP2040 key-press tester for stacked XIAO nRF52840 (ZMK).
+ * XIAO RP2040 virtual-finger-30sec for ZMK sleep_xiao / awake_xiao.
  *
  * Every INTERVAL_MS, pulse TARGET_PIN low (to GND) for PULSE_MS,
  * then return to Hi-Z (INPUT). Other D0-D10 pins stay Hi-Z.
  *
- * PULSE_MS must cover nRF wake-from-sleep + ZMK debounce. Manual
- * shorts work with a long hold; 50ms often fails after deep sleep.
+ * PULSE_MS must cover nRF wake-from-sleep + ZMK debounce.
  *
- * Power: give this board its own USB power. Share GND + GPIO only
- * with the battery-powered nRF52840. Do not tie 3V3/5V/BAT together.
+ * Pair: arduino/.../virtual-finger-30sec  +  ZMK sleep_xiao or awake_xiao
+ * Power: USB on this board. Share GND + GPIO only with LiPo nRF.
  */
 
 constexpr uint8_t PIN_COUNT = 11; // D0 .. D10
@@ -27,9 +26,8 @@ static void allPinsHiZ() {
 }
 
 static void pulsePinToGnd(uint8_t pin) {
-  // User-visible feedback that the tester is firing (XIAO RP2040 RGB red).
   pinMode(PIN_LED_R, OUTPUT);
-  digitalWrite(PIN_LED_R, LOW); // active low on XIAO RP2040
+  digitalWrite(PIN_LED_R, LOW);
 
   pinMode(pin, OUTPUT);
   digitalWrite(pin, LOW);

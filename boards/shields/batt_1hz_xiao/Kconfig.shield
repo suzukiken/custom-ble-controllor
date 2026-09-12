@@ -1,2 +1,0 @@
-config SHIELD_BATT_1HZ_XIAO
-	def_bool $(shields_list_contains,batt_1hz_xiao)

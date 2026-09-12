@@ -1,6 +1,42 @@
-# Xiao ZMK Config
+# Xiao BLE Controller
 
-Seeed Studio XIAO nRF52840 向けの ZMK user config です。`pcb/` の基板組み合わせごとに shield を分け、GitHub Actions で UF2 をビルドします。
+Seeed XIAO 向けのファーム／周辺ツール集です。**スタック（どの MCU・どのランタイムか）で場所が分かれています。**
+
+## ファームの場所（まずここ）
+
+| 種類 | 置き場 | 例 |
+| --- | --- | --- |
+| **ZMK（XIAO nRF52840）** | リポジトリ直下 `config/` + `boards/shields/` | `sleep_xiao`, `onekey_xiao`, … |
+| **Arduino（XIAO RP2040）** | [`arduino/xiao-rp2040/`](arduino/xiao-rp2040/) | `virtual-finger-30sec`（nRF を押す仮想指） |
+
+積み重ね（nRF + RP2040）のペア:
+
+| ZMK shield（nRF・電池） | RP2040 finger（USB） |
+| --- | --- |
+| `sleep_xiao`（deep sleep **あり**） | [`virtual-finger-30sec`](arduino/xiao-rp2040/virtual-finger-30sec/) |
+| `awake_xiao`（deep sleep **なし**） | 同じ [`virtual-finger-30sec`](arduino/xiao-rp2040/virtual-finger-30sec/) |
+
+### スリープあり／なし比較（手元の機材向け）
+
+公平に見るには **打鍵周期を同じにして sleep だけ変える**。
+
+| 役割 | nRF ファーム | RP2040 | ホスト例 | 見るもの |
+| --- | --- | --- | --- | --- |
+| A | `sleep_xiao`（deep sleep **あり**） | `virtual-finger-30sec` | iPad | 持ち時間 |
+| B | `awake_xiao`（deep sleep **なし**） | `virtual-finger-30sec` | iPhone | 持ち時間 |
+| C | `sleep_xiao`（deep sleep **あり**） | **なし**（接続だけ） | Mac | ベースライン |
+
+- 電池3本は満充電から開始。nRF=LiPo / RP2040=USB。GND+D0 のみ共有。
+- ホストはどれも近く・同じ部屋に固定（距離差で再送が増えると壊れる）。
+- 画面は自動ロック「しない」、試験中は寝かさない。
+- 切れ時刻か、最後に動いていた時間で比較。A≪B なら sleep が効いている。A≈B なら接続維持が支配的。
+- C が A より大幅に長いなら「30秒打鍵＋起床」のコストが見える。
+
+詳細は [`arduino/README.md`](arduino/README.md)。ZMK は user-config の都合でルートに残しています。
+
+---
+
+## ZMK user config（nRF52840）
 
 Board は `xiao_ble//zmk`。ZMK 本体は [`config/west.yml`](config/west.yml) で commit `268b1b1e82150460f00fd701bcd08583d5c75d29` に固定しています。
 
@@ -15,18 +51,16 @@ Board は `xiao_ble//zmk`。ZMK 本体は [`config/west.yml`](config/west.yml) �
 | `fourway_xiao` | `main-board-8` + `4way-re-board`（8ピン, RKJXT1F42001） | 下表 | 十字・Enter・音量 |
 | `key_encoder_xiao` | Xiao + keyswitch + encoder 一体 | D0=SW / D1=A, D2=B, GND | `SPACE` + 方向キー上下 |
 | `rkjxt_xiao` | Xiao + RKJXT1F42001 一体 | 下表 | 十字・Enter・音量 |
-| `batt_test_xiao` | 電池寿命実験用（D0 キーのみ） | D0 ↔ GND | 30秒おきページめくり想定 |
+| `sleep_xiao` | 仮想指 30秒 + deep sleep あり | D0 ↔ GND | `virtual-finger-30sec` |
+| `awake_xiao` | 仮想指 30秒 + deep sleep **なし** | D0 ↔ GND | 同じ `virtual-finger-30sec` |
 | `powerbtn_xiao` | 電源ボタン（ZMK Soft Off） | D0 ↔ GND | 3秒長押しで System OFF / 押して起動 |
-| `batt_1hz_xiao` | ZMK 電池 soak（キー負荷） | D0=RIGHT / D1=LEFT / D2=Enter | RP2040 約1Hz（RL×4→R→Enter）後に time/power をHID出力 |
 
-BLE 名はそれぞれ `OneKey Xiao` / `Key Xiao` / `Encoder Xiao` / `PushEnc Xiao` / `Fourway Xiao` / `KeyEnc Xiao` / `Rkjxt Xiao` / `BattTest Xiao` / `PowerBtn Xiao` / `Batt1Hz Xiao` です（ZMK の上限は15文字）。
-
-BLE 名はそれぞれ `OneKey Xiao` / `Key Xiao` / `Encoder Xiao` / `PushEnc Xiao` / `Fourway Xiao` / `KeyEnc Xiao` / `Rkjxt Xiao` / `BattTest Xiao` / `PowerBtn Xiao` / `Batt1Hz Xiao` です（ZMK の上限は15文字）。
+BLE 名はそれぞれ `OneKey Xiao` / `Key Xiao` / `Encoder Xiao` / `PushEnc Xiao` / `Fourway Xiao` / `KeyEnc Xiao` / `Rkjxt Xiao` / `Sleep Xiao` / `Awake Xiao` / `PowerBtn Xiao` です（ZMK の上限は15文字）。
 
 共通設定（各 `config/*.conf`）:
 
 - `CONFIG_ZMK_BLE=y` / `CONFIG_ZMK_USB=n`
-- `CONFIG_ZMK_SLEEP=y` / `CONFIG_ZMK_IDLE_SLEEP_TIMEOUT=60000`（60秒）。`powerbtn_xiao` だけ `CONFIG_ZMK_SLEEP=n`（明示オフまで ON のまま）
+- `CONFIG_ZMK_SLEEP=y` / `CONFIG_ZMK_IDLE_SLEEP_TIMEOUT=60000`（60秒）。`powerbtn_xiao` と `awake_xiao` は `CONFIG_ZMK_SLEEP=n`
 - エンコーダ付きは `CONFIG_EC11=y`
 
 ## 配線
@@ -115,7 +149,7 @@ XIAO D0 ----[ switch ]---- XIAO GND
 
 `zmk,kscan-gpio-direct`。短押しではキーは出ず、3秒長押しで Soft Off（後述）。
 
-### batt_test_xiao（電池持ち実験）
+### sleep_xiao（deep sleep あり・仮想指 30秒）
 
 目的は「BLE 接続したまま、約30秒に1回ページめくり相当のキーが出る」ときの持ち時間の見積もりです。
 
@@ -123,107 +157,35 @@ XIAO D0 ----[ switch ]---- XIAO GND
 XIAO D0 ----[ switch or external timer ]---- XIAO GND
 ```
 
-- キー: `RIGHT`（Kindle で効かなければ `config/batt_test_xiao.keymap` を `SPACE` に変更）
+- キー: `RIGHT`（Kindle で効かなければ `config/sleep_xiao.keymap` を `SPACE` に変更）
 - 入力後 **5秒** でスリープ（`CONFIG_ZMK_IDLE_SLEEP_TIMEOUT=5000`）
 - 30秒周期なら、大半の時間はスリープになる想定
 
 #### 実験のやり方
 
 1. LiPo を XIAO の BAT に接続し、この uf2 を書く
-2. iPhone と `BattTest Xiao` をペアリングし、Kindle を開く
+2. iPhone と `Sleep Xiao` をペアリングし、Kindle を開く
 3. **30秒に1回** D0 を GND へ落とす（手押しでも可）
 4. 電池切れ／電源断まで時間を測る
 
-完全自動にしたい場合は、積み重ねた **XIAO RP2040**（[`tester-rp2040`](tester-rp2040/tester-rp2040.ino)）で30秒ごとに D0 を GND へ落とします。RP2040 は USB 電源、nRF52840 は電池、**GND と GPIO だけ共有**（3V3/5V/BAT は繋がない）。
+完全自動にしたい場合は、積み重ねた **XIAO RP2040**（[`virtual-finger-30sec`](arduino/xiao-rp2040/virtual-finger-30sec/virtual-finger-30sec.ino)）で30秒ごとに D0 を GND へ落とします。RP2040 は USB 電源、nRF52840 は電池、**GND と GPIO だけ共有**（3V3/5V/BAT は繋がない）。
 
 見積もりの目安: `稼働時間 = 満充電から不能になるまでの時間`。  
 手動と自動で周期がずれても、`回数 × 30秒` から換算できます。
 
-### batt_1hz_xiao（推奨・ZMK＋キー負荷の電池寿命）
+## virtual-finger-30sec（Arduino RP2040）
 
-最終製品が ZMK 前提なので、**キーをガンガン飛ばしたときの持ち**はこちらで測ります。
+置き場: [`arduino/xiao-rp2040/virtual-finger-30sec/`](arduino/xiao-rp2040/virtual-finger-30sec/)
 
-```text
-XIAO nRF D0..D2  ←→  XIAO RP2040 D0..D2
-XIAO nRF GND     ←→  XIAO RP2040 GND
-（3V3 / 5V / BAT は繋がない。旧 D3–D10 配線は外してOK）
-nRF = LiPo / RP2040 = USB
-```
+XIAO RP2040 が 30 秒周期で `D0` を **500ms** LOW にします（nRF のスリープ復帰＋デバウンス用）。未使用の `D1`–`D10` は Hi-Z。パルス時は赤 LED が点灯します。
 
-| 役割 | 内容 |
-| --- | --- |
-| RP2040 | `(RIGHT, LEFT)×4 → RIGHT → Enter` を約1Hz。Enter 後に約2秒休止 |
-| ZMK `batt_1hz_xiao` | スリープなし。打鍵を BLE HID でホストへ |
-| ZMK `src/soak_status.c` | Enter の直後にステータス行を HID で打つ（例: `time: 06915, power=54`） |
+GitHub Actions [`Build Arduino RP2040 virtual-finger-30sec`](.github/workflows/build-arduino-rp2040-virtual-finger-30sec.yml) が UF2 を出します。
 
-メモ／Notes の例（左右キーは空行ではほぼ痕跡なし）:
-
-```text
-time: 00012, power=99
-time: 00024, power=98
-time: 00036, power=98
-```
-
-- **持ち時間** … 最後の `time:` の秒
-- **残量** … `power=`（%）。電圧が取れるときは `, mv=3921` も付く
-- 接続先は触らない **iPad**（自動ロック「しない」＋充電）が楽
-- UF2: `batt_1hz_xiao-…uf2` と Actions `Build RP2040 digits tester`（中身は RIGHT/LEFT/Enter シーケンス）
-
-BattMon（Arduino）は「キー無し・テレメトリ専用」の比較用です。ZMK 実使用に近い負荷はこの shield を使ってください。
-
-## RP2040 キーテスター（Arduino）
-
-電池試験用に、XIAO RP2040 が 30 秒周期で `D0` を **500ms** LOW にするファームです（nRF のスリープ復帰＋デバウンス用。短すぎると手動短絡は成功しても自動は失敗しやすい）。未使用の `D1`–`D10` は Hi-Z のままです。パルス時は赤 LED が点灯します。
-
-GitHub Actions [`Build RP2040 tester`](.github/workflows/build-rp2040.yml) が UF2 を出します。
-
-1. Actions の Artifacts から `rp2040-tester-firmware` をダウンロード
+1. Actions の Artifacts から `arduino-rp2040-virtual-finger-30sec` をダウンロード
 2. XIAO RP2040 で **B を押しながら R**（または B 押しながら挿す）→ `RPI-RP2` ドライブ
-3. `xiao-rp2040-key-tester.uf2` をドラッグ&ドロップ
+3. `xiao-rp2040-virtual-finger-30sec.uf2` をドラッグ&ドロップ
 
-周期や対象ピンは `tester-rp2040/tester-rp2040.ino` の `INTERVAL_MS` / `TARGET_PIN` で変更できます。
-
-## バッテリー監視（BattMon・キー無し比較用）
-
-ZMK ではなく Arduino。スリープなしで約5分ごとに `uptime_s` / `%` / `voltage_mv` を Mac ロガーへ送ります。**キー負荷は無い**ので、ZMK＋打鍵の寿命測定には `batt_1hz_xiao` を使ってください。
-
-| 側 | 場所 |
-| --- | --- |
-| ファーム | [`batt_monitor_xiao/`](batt_monitor_xiao/batt_monitor_xiao.ino) |
-| Mac ロガー | [`mac-batt-logger/`](mac-batt-logger/logger.py) |
-
-送信例（1行）:
-
-```text
-uptime_s=600 percent=87 voltage_mv=3921
-```
-
-### ファーム書き込み
-
-1. Actions [`Build batt monitor`](.github/workflows/build-batt-monitor.yml) の Artifact `batt-monitor-firmware` から `xiao-nrf52840-batt-monitor.uf2` を取得  
-   （または Arduino IDE: Board = **Seeed XIAO nRF52840** / Seeed nRF52 Boards）
-2. XIAO nRF52840 を `RST` 素早く2回 → ブートローダーへ UF2 をコピー
-3. BLE 名は `BattMon Xiao`。送信時のみ赤 LED が短く点灯
-
-LiPo は BAT+ / GND に接続。長時間の持ち測定では USB を抜く（挿したままだと充電され電圧が歪む）。
-
-### Mac 側（Python）
-
-Bluetooth 権限がオンの macOS で（試験中は Mac を寝かさない: `caffeinate -dims` など）:
-
-```bash
-cd mac-batt-logger
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-python logger.py -o ~/Desktop/batt-monitor-log.tsv
-```
-
-- 接続後すぐ、その後約5分ごとに追記（ファーム更新周期）
-- `batt-monitor-log.tsv` … 履歴（`host_iso`, `uptime_s`, `percent`, `voltage_mv`）
-- `batt-monitor-log-latest.tsv` … 最新1件
-- 電池切れで切れたあとは、TSV 最終行の `uptime_s` を持ち時間として読む
-- OS の Bluetooth ペアリングは不要。GATT が古いときは Bluetooth オフ／オン
+周期や対象ピンは `virtual-finger-30sec.ino` の `INTERVAL_MS` / `TARGET_PIN` で変更できます。
 
 ## 電源ボタン（Soft Off）
 
@@ -263,11 +225,11 @@ include:
   - board: xiao_ble//zmk
     shield: rkjxt_xiao
   - board: xiao_ble//zmk
-    shield: batt_test_xiao
+    shield: sleep_xiao
+  - board: xiao_ble//zmk
+    shield: awake_xiao
   - board: xiao_ble//zmk
     shield: powerbtn_xiao
-  - board: xiao_ble//zmk
-    shield: batt_1hz_xiao
   - board: xiao_ble//zmk
     shield: settings_reset
 ```
@@ -281,9 +243,9 @@ include:
 - `fourway_xiao-xiao_ble__zmk-zmk.uf2`
 - `key_encoder_xiao-xiao_ble__zmk-zmk.uf2`
 - `rkjxt_xiao-xiao_ble__zmk-zmk.uf2`
-- `batt_test_xiao-xiao_ble__zmk-zmk.uf2`
+- `sleep_xiao-xiao_ble__zmk-zmk.uf2`
+- `awake_xiao-xiao_ble__zmk-zmk.uf2`
 - `powerbtn_xiao-xiao_ble__zmk-zmk.uf2`
-- `batt_1hz_xiao-xiao_ble__zmk-zmk.uf2`
 - `settings_reset-xiao_ble__zmk-zmk.uf2`（BLE ペアリング復旧用）
 
 ### UF2 書き込み
@@ -312,56 +274,18 @@ OS の Bluetooth 設定で上記 BLE 名を選択。`BT_CLR` 等は未割り当�
 ```text
 .
 ├── .github/workflows/
-│   ├── build.yml                 # ZMK
-│   ├── build-rp2040.yml          # XIAO RP2040 key tester
-│   ├── build-rp2040-digits.yml   # XIAO RP2040 digit-line tester
-│   └── build-batt-monitor.yml    # XIAO nRF52840 battery monitor
-├── .gitignore
+│   ├── build.yml                                      # ZMK (nRF)
+│   └── build-arduino-rp2040-virtual-finger-30sec.yml  # Arduino RP2040
+├── arduino/
+│   ├── README.md
+│   └── xiao-rp2040/
+│       └── virtual-finger-30sec/         # ↔ ZMK sleep_xiao / awake_xiao
+├── config/                               # ZMK conf / keymap / west.yml
+├── boards/shields/                       # ZMK shields
 ├── build.yaml
-├── README.md
-├── batt_monitor_xiao/
-│   └── batt_monitor_xiao.ino
-├── tester-digits-rp2040/
-│   └── tester-digits-rp2040.ino
-├── src/
-│   └── soak_status.c             # batt_1hz status line after Enter
-├── mac-batt-logger/
-│   ├── logger.py
-│   └── requirements.txt
-├── tester-rp2040/
-│   └── tester-rp2040.ino
-├── config/
-│   ├── west.yml
-│   ├── onekey_xiao.conf / .keymap
-│   ├── key_xiao.conf / .keymap
-│   ├── encoder_xiao.conf / .keymap
-│   ├── push_encoder_xiao.conf / .keymap
-│   ├── key_encoder_xiao.conf / .keymap
-│   ├── rkjxt_xiao.conf / .keymap
-│   ├── batt_test_xiao.conf / .keymap
-│   ├── batt_1hz_xiao.conf / .keymap
-│   └── powerbtn_xiao.conf / .keymap
-├── boards/shields/
-│   ├── onekey_xiao/
-│   ├── key_xiao/
-│   ├── encoder_xiao/
-│   ├── push_encoder_xiao/
-│   ├── fourway_xiao/
-│   ├── key_encoder_xiao/
-│   ├── rkjxt_xiao/
-│   ├── batt_test_xiao/
-│   ├── batt_1hz_xiao/
-│   └── powerbtn_xiao/
+├── CMakeLists.txt / Kconfig / zephyr/    # ZMK extra module
 ├── pcb/
-│   ├── one-key.kicad_pcb
-│   ├── main-board.kicad_pcb
-│   ├── main-board-8.kicad_pcb
-│   ├── key-board.kicad_pcb
-│   ├── encoder-board.kicad_pcb
-│   ├── push-encoder-board.kicad_pcb
-│   ├── 4way-re-board.kicad_pcb
-│   └── README.md
-└── zephyr/module.yml
+└── 3d/
 ```
 
 Gerber（`*.gbr`）・ドリル（`*.drl`）・`*.kicad_prl` / `fp-info-cache` / `.history/` は `.gitignore` 対象です。
