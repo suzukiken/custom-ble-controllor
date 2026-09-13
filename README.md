@@ -197,8 +197,20 @@ nRF GND --- RP2040 GND
 初回は両方きれいにしてからペアしてください。
 
 1. nRF にいったん `settings_reset` を書き、すぐ `sleep_xiao_pi` を書き直す
-2. Pi: `bluetoothctl remove E8:D1:1D:37:2C:AF`（該当デバイス）、必要なら `sudo systemctl restart bluetooth`
-3. デバイスを起こした状態で `scan on` → `pair` → `trust` → `connect`
+2. Pi: `bluetoothctl remove <addr>`（該当デバイス）、必要なら `sudo systemctl restart bluetooth`
+3. デバイスを起こした状態（D0 パルス後〜60秒以内）で次を実行
+
+```text
+agent off
+agent NoInputNoOutput
+default-agent
+scan on
+pair <addr>
+trust <addr>
+connect <addr>
+```
+
+**重要:** デスクトップ GUI に「Enter Code 2314134」のような表示が出ることがあります。これは「キーボードでパスコードを打て」という意味で、数字キーの無い本機では入力できません。**GUI のダイアログはキャンセル**し、上記のとおり `agent NoInputNoOutput` の bluetoothctl だけでペアしてください（Just Works）。GUI エージェントが割り込むと失敗しやすいです。
 
 ## virtual-finger（Arduino RP2040）
 
