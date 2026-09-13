@@ -16,6 +16,7 @@ Seeed XIAO 向けのファーム／周辺ツール集です。**スタック（�
 | `sleep_xiao`（deep sleep **あり**） | [`virtual-finger`](arduino/xiao-rp2040/virtual-finger/)（D0） |
 | `sleep_xiao_pi`（同上 + Pi/BlueZ 向け BLE） | 同じ |
 | `awake_xiao`（deep sleep **なし**） | 同じ |
+| `awake_xiao_pi`（awake + Pi/BlueZ 向け BLE） | 同じ |
 
 RP2040: **D0** を約5分おきにパルス。nRF は `time: …, power=…, mode=…` を打つ。
 
@@ -58,9 +59,10 @@ Board は `xiao_ble//zmk`。ZMK 本体は [`config/west.yml`](config/west.yml) �
 | `sleep_xiao` | 仮想指 + deep sleep あり | D0 ↔ RP2040 | D0=status |
 | `sleep_xiao_pi` | `sleep_xiao` + Raspberry Pi/BlueZ 向け BLE | 同上 | 2M PHY 無効など |
 | `awake_xiao` | 仮想指 + deep sleep **なし** | D0 ↔ RP2040 | D0=status |
+| `awake_xiao_pi` | `awake_xiao` + Pi/BlueZ 向け BLE | 同上 | 接続切り分け用 |
 | `powerbtn_xiao` | 電源ボタン（ZMK Soft Off） | D0 ↔ GND | 3秒長押しで System OFF / 押して起動 |
 
-BLE 名はそれぞれ `OneKey Xiao` / `Key Xiao` / `Encoder Xiao` / `PushEnc Xiao` / `Fourway Xiao` / `KeyEnc Xiao` / `Rkjxt Xiao` / `Sleep Xiao` / `Sleep Pi Xiao` / `Awake Xiao` / `PowerBtn Xiao` です（ZMK の上限は15文字）。
+BLE 名はそれぞれ `OneKey Xiao` / `Key Xiao` / `Encoder Xiao` / `PushEnc Xiao` / `Fourway Xiao` / `KeyEnc Xiao` / `Rkjxt Xiao` / `Sleep Xiao` / `Sleep Pi Xiao` / `Awake Xiao` / `Awake Pi Xiao` / `PowerBtn Xiao` です（ZMK の上限は15文字）。
 
 status の周期は nRF 側ではなく **RP2040**（既定 5 分）が決めます。
 
@@ -212,6 +214,21 @@ connect <addr>
 
 **重要:** デスクトップ GUI に「Enter Code 2314134」のような表示が出ることがあります。これは「キーボードでパスコードを打て」という意味で、数字キーの無い本機では入力できません。**GUI のダイアログはキャンセル**し、上記のとおり `agent NoInputNoOutput` の bluetoothctl だけでペアしてください（Just Works）。GUI エージェントが割り込むと失敗しやすいです。
 
+#### つながらないときの切り分け
+
+ログの `Connected: yes`/`no` 連打 + `le-connection-abort-by-local` は、だいたい次の合成です。
+
+1. **ペア未完了／壊れたボンド**（GUI パスコードをキャンセルしたあとに特に多い。`trust` だけでは足りない）
+2. **BlueZ × ZMK HID** の相性（2M PHY・認証。ファーム側は 2M 無効などを入れ済み）
+3. **deep sleep**（広告が止まる／再接続のたびに同じ失敗を繰り返す）
+
+先に **`awake_xiao_pi`（BLE名 `Awake Pi Xiao`）** でペアを試してください。deep sleep なし・同じ BLE 対策です。
+
+- `awake_xiao_pi` で安定する → 問題は主に sleep／再接続。そのボンドのまま `sleep_xiao_pi` へ載せ替えを検討
+- `awake_xiao_pi` でも同じ → deep sleep ではなく **Pi/BlueZ 側**（ボンド掃除・agent・場合によって BT ドングル／OS）が本丸
+
+そのとき `info <addr>` で `Paired: yes` か、できれば `sudo btmon` の切断理由（Authentication / Timeout 等）を見ると次が決まります。
+
 ## virtual-finger（Arduino RP2040）
 
 置き場: [`arduino/xiao-rp2040/virtual-finger/`](arduino/xiao-rp2040/virtual-finger/)
@@ -274,6 +291,8 @@ include:
   - board: xiao_ble//zmk
     shield: awake_xiao
   - board: xiao_ble//zmk
+    shield: awake_xiao_pi
+  - board: xiao_ble//zmk
     shield: powerbtn_xiao
   - board: xiao_ble//zmk
     shield: settings_reset
@@ -291,6 +310,7 @@ include:
 - `sleep_xiao-xiao_ble__zmk-zmk.uf2`
 - `sleep_xiao_pi-xiao_ble__zmk-zmk.uf2`
 - `awake_xiao-xiao_ble__zmk-zmk.uf2`
+- `awake_xiao_pi-xiao_ble__zmk-zmk.uf2`
 - `powerbtn_xiao-xiao_ble__zmk-zmk.uf2`
 - `settings_reset-xiao_ble__zmk-zmk.uf2`（BLE ペアリング復旧用）
 

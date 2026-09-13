@@ -1,0 +1,6 @@
+if SHIELD_AWAKE_XIAO_PI
+
+config ZMK_KEYBOARD_NAME
+	default "Awake Pi Xiao"
+
+endif
