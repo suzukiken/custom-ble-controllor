@@ -14,6 +14,7 @@ Seeed XIAO 向けのファーム／周辺ツール集です。**スタック（�
 | ZMK shield（nRF・電池） | RP2040 finger（USB） |
 | --- | --- |
 | `sleep_xiao`（deep sleep **あり**） | [`virtual-finger`](arduino/xiao-rp2040/virtual-finger/)（D0） |
+| `sleep_xiao_pi`（同上 + Pi/BlueZ 向け BLE） | 同じ |
 | `awake_xiao`（deep sleep **なし**） | 同じ |
 
 RP2040: **D0** を約5分おきにパルス。nRF は `time: …, power=…, mode=…` を打つ。
@@ -55,10 +56,11 @@ Board は `xiao_ble//zmk`。ZMK 本体は [`config/west.yml`](config/west.yml) �
 | `key_encoder_xiao` | Xiao + keyswitch + encoder 一体 | D0=SW / D1=A, D2=B, GND | `SPACE` + 方向キー上下 |
 | `rkjxt_xiao` | Xiao + RKJXT1F42001 一体 | 下表 | 十字・Enter・音量 |
 | `sleep_xiao` | 仮想指 + deep sleep あり | D0 ↔ RP2040 | D0=status |
+| `sleep_xiao_pi` | `sleep_xiao` + Raspberry Pi/BlueZ 向け BLE | 同上 | 2M PHY 無効など |
 | `awake_xiao` | 仮想指 + deep sleep **なし** | D0 ↔ RP2040 | D0=status |
 | `powerbtn_xiao` | 電源ボタン（ZMK Soft Off） | D0 ↔ GND | 3秒長押しで System OFF / 押して起動 |
 
-BLE 名はそれぞれ `OneKey Xiao` / `Key Xiao` / `Encoder Xiao` / `PushEnc Xiao` / `Fourway Xiao` / `KeyEnc Xiao` / `Rkjxt Xiao` / `Sleep Xiao` / `Awake Xiao` / `PowerBtn Xiao` です（ZMK の上限は15文字）。
+BLE 名はそれぞれ `OneKey Xiao` / `Key Xiao` / `Encoder Xiao` / `PushEnc Xiao` / `Fourway Xiao` / `KeyEnc Xiao` / `Rkjxt Xiao` / `Sleep Xiao` / `Sleep Pi Xiao` / `Awake Xiao` / `PowerBtn Xiao` です（ZMK の上限は15文字）。
 
 status の周期は nRF 側ではなく **RP2040**（既定 5 分）が決めます。
 
@@ -176,6 +178,28 @@ nRF GND --- RP2040 GND
 
 見積もりの目安: `稼働時間 = 満充電から不能になるまでの時間`。最後の `time:` でも比較できます。
 
+### sleep_xiao_pi（Raspberry Pi / BlueZ 向け）
+
+`sleep_xiao` と同じ打鍵・スリープ構成で、**BLE だけ** Linux（特に Raspberry Pi の BlueZ）向けに変えています。
+
+ログに `le-connection-abort-by-local` と `Connected: yes`/`no` の高速点滅が出る場合、多くは次のどちらかです。
+
+1. **Pi 側がリンクを切っている**（2M PHY 交渉や SMP/ボンディング不整合で BlueZ が abort）
+2. **片方だけの古いボンド**（iPhone 等とペアした鍵が残り、Pi が同じアドレスに古い鍵で接続しようとして失敗→再試行ループ）
+
+`sleep_xiao_pi` では主に次を入れています。
+
+- `CONFIG_ZMK_BLE_EXPERIMENTAL_CONN=y` / `CONFIG_BT_CTLR_PHY_2M=n`（2M PHY 無効）
+- ボンド上書き許可（再ペアしやすくする）
+- `CONFIG_BT_GATT_ENFORCE_SUBSCRIPTION=n`
+- idle sleep を 60 秒（ペアリング完了までの余裕）
+
+初回は両方きれいにしてからペアしてください。
+
+1. nRF にいったん `settings_reset` を書き、すぐ `sleep_xiao_pi` を書き直す
+2. Pi: `bluetoothctl remove E8:D1:1D:37:2C:AF`（該当デバイス）、必要なら `sudo systemctl restart bluetooth`
+3. デバイスを起こした状態で `scan on` → `pair` → `trust` → `connect`
+
 ## virtual-finger（Arduino RP2040）
 
 置き場: [`arduino/xiao-rp2040/virtual-finger/`](arduino/xiao-rp2040/virtual-finger/)
@@ -234,6 +258,8 @@ include:
   - board: xiao_ble//zmk
     shield: sleep_xiao
   - board: xiao_ble//zmk
+    shield: sleep_xiao_pi
+  - board: xiao_ble//zmk
     shield: awake_xiao
   - board: xiao_ble//zmk
     shield: powerbtn_xiao
@@ -251,6 +277,7 @@ include:
 - `key_encoder_xiao-xiao_ble__zmk-zmk.uf2`
 - `rkjxt_xiao-xiao_ble__zmk-zmk.uf2`
 - `sleep_xiao-xiao_ble__zmk-zmk.uf2`
+- `sleep_xiao_pi-xiao_ble__zmk-zmk.uf2`
 - `awake_xiao-xiao_ble__zmk-zmk.uf2`
 - `powerbtn_xiao-xiao_ble__zmk-zmk.uf2`
 - `settings_reset-xiao_ble__zmk-zmk.uf2`（BLE ペアリング復旧用）
