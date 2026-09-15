@@ -1,0 +1,6 @@
+if SHIELD_DRAIN_XIAO
+
+config ZMK_KEYBOARD_NAME
+	default "Drain Xiao"
+
+endif

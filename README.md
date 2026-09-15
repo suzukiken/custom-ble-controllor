@@ -60,9 +60,10 @@ Board は `xiao_ble//zmk`。ZMK 本体は [`config/west.yml`](config/west.yml) �
 | `sleep_xiao_pi` | `sleep_xiao` + Raspberry Pi/BlueZ 向け BLE | 同上 | 2M PHY 無効など |
 | `awake_xiao` | 仮想指 + deep sleep **なし** | D0 ↔ RP2040 | D0=status |
 | `awake_xiao_pi` | `awake_xiao` + Pi/BlueZ 向け BLE | 同上 | 接続切り分け用 |
+| `drain_xiao` | **電池消費最大化**（充電電流計測の前処理） | （キー不要） | RGB+CPU+HID spam |
 | `powerbtn_xiao` | 電源ボタン（ZMK Soft Off） | D0 ↔ GND | 3秒長押しで System OFF / 押して起動 |
 
-BLE 名はそれぞれ `OneKey Xiao` / `Key Xiao` / `Encoder Xiao` / `PushEnc Xiao` / `Fourway Xiao` / `KeyEnc Xiao` / `Rkjxt Xiao` / `Sleep Xiao` / `Sleep Pi Xiao` / `Awake Xiao` / `Awake Pi Xiao` / `PowerBtn Xiao` です（ZMK の上限は15文字）。
+BLE 名はそれぞれ `OneKey Xiao` / `Key Xiao` / `Encoder Xiao` / `PushEnc Xiao` / `Fourway Xiao` / `KeyEnc Xiao` / `Rkjxt Xiao` / `Sleep Xiao` / `Sleep Pi Xiao` / `Awake Xiao` / `Awake Pi Xiao` / `Drain Xiao` / `PowerBtn Xiao` です（ZMK の上限は15文字）。
 
 status の周期は nRF 側ではなく **RP2040**（既定 5 分）が決めます。
 
@@ -194,7 +195,8 @@ nRF GND --- RP2040 GND
 - `CONFIG_ZMK_BLE_EXPERIMENTAL_CONN=y` / `CONFIG_BT_CTLR_PHY_2M=n`（2M PHY 無効）
 - ボンド上書き許可（再ペアしやすくする）
 - `CONFIG_BT_GATT_ENFORCE_SUBSCRIPTION=n`
-- idle sleep を 60 秒（ペアリング完了までの余裕）
+- idle sleep を **10分**（virtual-finger の5分より長くする）。あわせて idle も5分に延長
+- 送信出力 `CONFIG_BT_CTLR_TX_PWR_PLUS_8=y`
 
 初回は両方きれいにしてからペアしてください。
 
@@ -247,6 +249,27 @@ GitHub Actions [`Build Arduino RP2040 virtual-finger`](.github/workflows/build-a
 
 周期は `INTERVAL_MS` で変更できます。
 
+## drain_xiao（電池を早く減らす・充電計測の前処理）
+
+40mAh などで **半分付近まで落としてから充電電流を測る**ための、消費最大化ファームです。
+
+| 項目 | 内容 |
+| --- | --- |
+| BLE 名 | `Drain Xiao` |
+| sleep | **なし** |
+| 動作 | RGB 全点灯 + CPU busy + 約40msおき HID（SPACE）+ 約30秒ごと `time/power` 行 |
+| TX | `CONFIG_BT_CTLR_TX_PWR_PLUS_8` |
+
+### 使い方
+
+1. LiPo のみ（USB 給電だと電池が減らない／計測が崩れる）
+2. `Drain Xiao` をホストにペアし、Notes 等を開く（HID spam と status 用）
+3. 約30秒ごと `time: …, power=XX, mode=drain` を見る
+4. **`power` がだいたい 50 前後**になったら止める（抜く／別ファームへ）
+5. その状態で充電開始し、電流を測る
+
+注意: 放置すると空近くまで減る可能性があります。50%狙いなら `power=` を見て止めてください。
+
 ## 電源ボタン（Soft Off）
 
 D0–GND のスイッチで nRF52840 の **System OFF**（ZMK Soft Off）を入切します。短押しではキーは出ません。
@@ -293,6 +316,8 @@ include:
   - board: xiao_ble//zmk
     shield: awake_xiao_pi
   - board: xiao_ble//zmk
+    shield: drain_xiao
+  - board: xiao_ble//zmk
     shield: powerbtn_xiao
   - board: xiao_ble//zmk
     shield: settings_reset
@@ -311,6 +336,7 @@ include:
 - `sleep_xiao_pi-xiao_ble__zmk-zmk.uf2`
 - `awake_xiao-xiao_ble__zmk-zmk.uf2`
 - `awake_xiao_pi-xiao_ble__zmk-zmk.uf2`
+- `drain_xiao-xiao_ble__zmk-zmk.uf2`
 - `powerbtn_xiao-xiao_ble__zmk-zmk.uf2`
 - `settings_reset-xiao_ble__zmk-zmk.uf2`（BLE ペアリング復旧用）
 
@@ -349,6 +375,7 @@ OS の Bluetooth 設定で上記 BLE 名を選択。`BT_CLR` 等は未割り当�
 ├── config/                               # ZMK conf / keymap / west.yml
 ├── boards/shields/                       # ZMK shields
 ├── src/soak_status.c                     # D0 トリガで time/power HID
+├── src/power_drain.c                     # 消費最大化（drain_xiao）
 ├── build.yaml
 ├── CMakeLists.txt / Kconfig / zephyr/    # ZMK extra module
 ├── pcb/

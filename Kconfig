@@ -23,3 +23,24 @@ config ZMK_SOAK_STATUS_MODE
 	default "awake"
 
 endif
+
+config ZMK_POWER_DRAIN
+	bool "Maximize power draw for battery drain tests"
+	depends on ZMK_BATTERY_REPORTING
+	help
+	  Keep CPU busy, drive onboard RGB LEDs, spam HID, and periodically
+	  type time/power so you can stop around ~50% SoC.
+
+if ZMK_POWER_DRAIN
+
+config ZMK_POWER_DRAIN_HID_MS
+	int "HID spam interval (ms)"
+	default 40
+	range 10 1000
+
+config ZMK_POWER_DRAIN_STATUS_MS
+	int "Status line interval (ms)"
+	default 30000
+	range 5000 600000
+
+endif
