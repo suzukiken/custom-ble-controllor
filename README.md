@@ -257,7 +257,7 @@ GitHub Actions [`Build Arduino RP2040 virtual-finger`](.github/workflows/build-a
 | --- | --- |
 | BLE 名 | `Drain Xiao` |
 | sleep | **なし** |
-| 動作 | RGB 全点灯 + CPU busy + 約40msおき HID（SPACE）+ 約30秒ごと `time/power` 行 |
+| 動作 | RGB 全点灯 + CPU busy + 約40msおき HID（`RIGHT`）+ 約30秒ごと `time/power` 行（末尾改行） |
 | TX | `CONFIG_BT_CTLR_TX_PWR_PLUS_8` |
 
 ### 使い方

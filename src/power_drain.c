@@ -202,7 +202,8 @@ static void spam_work_handler(struct k_work *work) {
     clear_stuck_typing();
     if (!typing_busy) {
         self_emitting = true;
-        raise_zmk_keycode_state_changed_from_encoded(SPACE, !spam_down, k_uptime_get());
+        /* RIGHT moves the caret without inserting junk that forces horizontal scroll. */
+        raise_zmk_keycode_state_changed_from_encoded(RIGHT, !spam_down, k_uptime_get());
         self_emitting = false;
         spam_down = !spam_down;
     }
